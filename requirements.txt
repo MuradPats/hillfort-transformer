@@ -1,0 +1,19 @@
+cv2
+easydict
+geopandas
+matplotlib
+numpy
+pandas
+pillow
+plotnine
+rasterio
+scikit-learn
+scipy
+shapely
+tqdm
+# Use the PyTorch wheel index as an extra index so PyPI remains the primary source.
+# This ensures the following torch packages are fetched from the CUDA 13.0 wheel index
+# while earlier packages are installed from the default PyPI.
+--extra-index-url https://download.pytorch.org/whl/cu130
+torch==1.13.0
+torchvision==0.14.0
