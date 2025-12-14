@@ -5,6 +5,11 @@ data/raw/inspire/*
 datasets/
 !data/raw/inspire/*.zip
 
+data/raw/dtmFiles/
+data/raw/reljeefFiles/
+data/raw/ortoFiles/
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
