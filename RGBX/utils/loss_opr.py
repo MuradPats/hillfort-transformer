@@ -185,3 +185,61 @@ class ProbOhemCrossEntropy2d(nn.Module):
         target = target.view(b, h, w)
 
         return self.criterion(pred, target)
+
+
+class DiceLoss(nn.Module):
+    """Binary Dice loss operating on logits and integer targets (0/1)."""
+
+    def __init__(self, eps: float = 1e-6, ignore_index: int = 255):
+        super(DiceLoss, self).__init__()
+        self.eps = eps
+        self.ignore_index = ignore_index
+
+    def forward(self, logits: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        # logits: (B, C, H, W), target: (B, H, W)
+        if logits.dim() != 4:
+            raise ValueError("Logits must be 4D tensor")
+
+        probs = F.softmax(logits, dim=1)
+        # assume binary: class 1 is positive
+        if probs.size(1) == 1:
+            pos_prob = probs[:, 0]
+        else:
+            pos_prob = probs[:, 1]
+
+        mask = (target != self.ignore_index).float()
+        target_pos = (target == 1).float() * mask
+
+        # flatten
+        prob_flat = pos_prob.view(pos_prob.size(0), -1)
+        targ_flat = target_pos.view(target_pos.size(0), -1)
+        mask_flat = mask.view(mask.size(0), -1)
+
+        intersection = (prob_flat * targ_flat).sum(dim=1)
+        cardinality = prob_flat.sum(dim=1) + targ_flat.sum(dim=1)
+
+        dice_score = (2.0 * intersection + self.eps) / (cardinality + self.eps)
+        loss = 1.0 - dice_score
+        return loss.mean()
+
+
+class DiceCrossEntropyLoss(nn.Module):
+    """Combination of Dice + CrossEntropy losses.
+
+    Args:
+        dice_weight: weight for Dice term
+        ce_weight: weight for CrossEntropy term
+        ignore_index: ignore label
+    """
+
+    def __init__(self, dice_weight: float = 1.0, ce_weight: float = 1.0, ignore_index: int = 255):
+        super(DiceCrossEntropyLoss, self).__init__()
+        self.dice = DiceLoss(ignore_index=ignore_index)
+        self.ce = nn.CrossEntropyLoss(ignore_index=ignore_index)
+        self.dice_weight = float(dice_weight)
+        self.ce_weight = float(ce_weight)
+
+    def forward(self, logits: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        ce_loss = self.ce(logits, target.long())
+        dice_loss = self.dice(logits, target)
+        return self.dice_weight * dice_loss + self.ce_weight * ce_loss
