@@ -14,6 +14,7 @@ select polygons that intersect the raster extent and burn value `--value`
 (default 1) into the output mask. Output masks are saved as single-channel
 uint8 PNG files with the same basename as the reference raster.
 """
+
 from pathlib import Path
 from typing import Iterable, List, Optional
 import argparse
@@ -35,7 +36,9 @@ def load_geoms(geom_path: Path) -> gpd.GeoDataFrame:
     return gdf
 
 
-def rasterize_for_raster(ref_raster: Path, geoms_gdf: gpd.GeoDataFrame, out_path: Path, value: int = 1) -> None:
+def rasterize_for_raster(
+    ref_raster: Path, geoms_gdf: gpd.GeoDataFrame, out_path: Path, value: int = 1
+) -> None:
     """Rasterize polygons that intersect `ref_raster` into `out_path`.
 
     - Reprojects `geoms_gdf` to the raster CRS if needed.
@@ -59,6 +62,7 @@ def rasterize_for_raster(ref_raster: Path, geoms_gdf: gpd.GeoDataFrame, out_path
         bounds = _src.bounds
 
     from shapely.geometry import box
+
     bbox_geom = box(bounds.left, bounds.bottom, bounds.right, bounds.top)
 
     try:
@@ -71,7 +75,13 @@ def rasterize_for_raster(ref_raster: Path, geoms_gdf: gpd.GeoDataFrame, out_path
         mask = np.zeros((height, width), dtype=np.uint8)
     else:
         shapes = ((mapping(g), int(value)) for g in candidates.geometry)
-        mask = rasterize(shapes, out_shape=(height, width), transform=transform, fill=0, dtype=np.uint8)
+        mask = rasterize(
+            shapes,
+            out_shape=(height, width),
+            transform=transform,
+            fill=0,
+            dtype=np.uint8,
+        )
 
     Image.fromarray(mask, mode="L").save(str(out_path))
 
@@ -82,16 +92,56 @@ def find_rasters(folder: Path, pattern: str = "**/*.tif") -> List[Path]:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--geom", required=True, help="Path to polygon file (shp, geojson)")
-    parser.add_argument("--ref", help="Reference raster file (single). If provided, only this raster is processed.")
-    parser.add_argument("--ref_dir", help="Directory with reference rasters (processed recursively)")
+    parser.add_argument(
+        "--geom",
+        default="data/raw/inspire/PS_ProtectedSite_malestisedPolygon.shp",
+        help="Path to polygon file (shp, geojson)",
+    )
+    parser.add_argument(
+        "--ref",
+        help="Reference raster file (single). If provided, only this raster is processed.",
+    )
+    parser.add_argument(
+        "--ref_dir",
+        default="data/raw/dtm",
+        help="Directory with reference rasters (processed recursively)",
+    )
     parser.add_argument("--out", required=True, help="Output directory for masks")
-    parser.add_argument("--value", type=int, default=255, help="Value to burn for polygons in mask (default 255)")
-    parser.add_argument("--map_numbers", help="CSV with map numbers and INSPIRE ids (e.g. data/linnamagede_ruudunumbrid.csv)")
-    parser.add_argument("--map_tile_col", default="Ruudunumber(1:10000)", help="Column name for tile id in map CSV (default: Ruudunumber(1:10000))")
-    parser.add_argument("--map_inspire_col", default="INSPIRE id", help="Column name for INSPIRE id in map CSV (default: 'INSPIRE id')")
-    parser.add_argument("--shp_inspire_col", default="inspireid_", help="Column name in shapefile that contains INSPIRE ids (default: inspireid_)")
+    parser.add_argument(
+        "--value",
+        type=int,
+        default=1,
+        help="Value to burn for polygons in mask (default 1)",
+    )
+    parser.add_argument(
+        "--map_numbers",
+        default="data/linnamagede_ruudunumbrid_v2.csv",
+        help="CSV with map numbers and INSPIRE ids (e.g. data/linnamagede_ruudunumbrid.csv)",
+    )
+    parser.add_argument(
+        "--map_tile_col",
+        default="Ruudunumber(1:10000)",
+        help="Column name for tile id in map CSV (default: Ruudunumber(1:10000))",
+    )
+    parser.add_argument(
+        "--map_inspire_col",
+        default="INSPIRE id",
+        help="Column name for INSPIRE id in map CSV (default: 'INSPIRE id')",
+    )
+    parser.add_argument(
+        "--shp_inspire_col",
+        default="inspireid_",
+        help="Column name in shapefile that contains INSPIRE ids (default: inspireid_)",
+    )
     args = parser.parse_args()
+
+    # Print args for logging
+    print("Arguments that will be used:")
+    for k, v in vars(args).items():
+        print(f"  {k}: {v}")
+    # print("Ensure that the paths and parameters are correct.")
+    # if input("Continue with these arguments? (y/n) ").lower() != "y":
+    #     raise SystemExit("Aborted by user.")
 
     geom_path = Path(args.geom)
     out_dir = Path(args.out)
@@ -105,6 +155,7 @@ def main():
     map_df = None
     if args.map_numbers:
         import pandas as pd
+
         map_csv = Path(args.map_numbers)
         if map_csv.exists():
             map_df = pd.read_csv(str(map_csv))
@@ -149,10 +200,14 @@ def main():
                         rasterize_for_raster(ref, subset, out_path, value=args.value)
                 else:
                     # No mapping for this tile, fallback to spatial intersection of all polygons
-                    print(f"No INSPIRE IDs found for tile {tile_id}, using spatial intersection.")
+                    print(
+                        f"No INSPIRE IDs found for tile {tile_id}, using spatial intersection."
+                    )
                     rasterize_for_raster(ref, gdf, out_path, value=args.value)
             else:
-                print(f"No map CSV provided, using spatial intersection for {ref.name}.")
+                print(
+                    f"No map CSV provided, using spatial intersection for {ref.name}."
+                )
                 rasterize_for_raster(ref, gdf, out_path, value=args.value)
         except Exception as e:
             print(f"Failed for {ref}: {e}")
