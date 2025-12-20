@@ -12,7 +12,7 @@ Creates dataset folder structure:
 Usage:
   python data/batch_convert.py --dtm_dir data/raw/dtm --sat_dir data/raw/satellite --out datasets/HillfortMVP
 
-This script converts single-band DTM -> 8-bit PNG (percentile scaling) and
+This script converts single-band DTM -> 8-bit TIFF (percentile scaling) and
 multiband satellite TIFF -> RGB PNG (per-band percentile scaling). It writes
 matching basenames and a `train.txt` file listing the processed tiles.
 """
@@ -190,20 +190,53 @@ def find_tifs(folder: Path) -> List[Path]:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dtm_dir", default="../data/raw/dtm", help="Directory with DTM TIFFs")
-    parser.add_argument("--sat_dir", default="../data/raw/satellite", help="Directory with satellite TIFFs")
-    parser.add_argument("--out", default="../datasets/HillfortMVP", help="Output directory for processed images")
+
     parser.add_argument(
-        "--method", default="minmax", choices=["minmax", "percentile"], help="Scaling method for converting to 8-bit"
+        "--dtm_dir", default="data/raw/dtm", help="Directory with DTM TIFFs"
     )
-    parser.add_argument("--pmin", type=float, default=2.0, help="Minimum percentile for scaling (percentile method). Default 2.0")
-    parser.add_argument("--pmax", type=float, default=98.0, help="Maximum percentile for scaling (percentile method). Default 98.0")
+    parser.add_argument(
+        "--sat_dir",
+        default="data/raw/satellite",
+        help="Directory with satellite TIFFs",
+    )
+    parser.add_argument(
+        "--out",
+        default="datasets/HillfortMVP",
+        help="Output directory for processed images",
+    )
+    parser.add_argument(
+        "--method",
+        default="minmax",
+        choices=["minmax", "percentile"],
+        help="Scaling method for converting to 8-bit",
+    )
+    parser.add_argument(
+        "--pmin",
+        type=float,
+        default=2.0,
+        help="Minimum percentile for scaling (percentile method). Default 2.0",
+    )
+    parser.add_argument(
+        "--pmax",
+        type=float,
+        default=98.0,
+        help="Maximum percentile for scaling (percentile method). Default 98.0",
+    )
     parser.add_argument(
         "--write_test",
         action="store_true",
         help="Also write test.txt (duplicates train.txt by default)",
     )
+
     args = parser.parse_args()
+
+    # Print arguments for confirmation
+    print("Arguments that will be used:")
+    for k, v in vars(args).items():
+        print(f"  {k}: {v}")
+    # print("Ensure that the paths and parameters are correct.")
+    # if input("Continue with these arguments? (y/n) ").lower() != "y":
+    #     raise SystemExit("Aborted by user.")
 
     dtm_dir = Path(args.dtm_dir)
     sat_dir = Path(args.sat_dir)
@@ -228,7 +261,7 @@ def main():
     # process DTM files
     for p in tqdm(dtm_files, desc="DTM"):
         name = p.stem
-        out_path = dtm_out / f"{name}.png"
+        out_path = dtm_out / f"{name}.tif"
         try:
             process_dtm(
                 str(p),
@@ -264,7 +297,7 @@ def main():
     common = []
     for name in sorted(basenames):
         rgb_f = rgb_out / f"{name}.png"
-        dtm_f = dtm_out / f"{name}.png"
+        dtm_f = dtm_out / f"{name}.tif"
         if rgb_f.exists() and dtm_f.exists():
             common.append(name)
 
