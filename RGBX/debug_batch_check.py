@@ -137,7 +137,7 @@ if fns is not None:
 # Compute batch positive fraction and whether downweight would trigger
 # show both raw (counts include ignore value 255) and adjusted (exclude 255)
 raw_pos_frac = float((gts > 0).float().mean().item())
-valid_mask = (gts != 255)
+valid_mask = gts != 255
 valid_count = int(valid_mask.sum().item())
 if valid_count == 0:
     adj_pos_frac = 0.0
@@ -145,7 +145,9 @@ else:
     adj_pos_frac = float(((gts > 0) & valid_mask).float().sum().item() / valid_count)
 
 print(f"batch positive fraction (raw incl.255): {raw_pos_frac:.6f}")
-print(f"batch positive fraction (adjusted excl.255): {adj_pos_frac:.6f} (valid pixels: {valid_count})")
+print(
+    f"batch positive fraction (adjusted excl.255): {adj_pos_frac:.6f} (valid pixels: {valid_count})"
+)
 th = getattr(config, "full_pos_frac_threshold", None)
 dw = getattr(config, "full_pos_downweight", None)
 if th is not None and dw is not None:

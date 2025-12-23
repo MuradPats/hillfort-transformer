@@ -54,7 +54,9 @@ with Engine(custom_parser=parser) as engine:
     # config network and criterion
     # Use 255 as ignore_index (safe sentinel not present in remapped 0/1 masks)
     if getattr(config, "loss_type", "dice_ce") == "dice_ce":
-        criterion = DiceCrossEntropyLoss(dice_weight=config.dice_weight, ce_weight=config.ce_weight, ignore_index=255)
+        criterion = DiceCrossEntropyLoss(
+            dice_weight=config.dice_weight, ce_weight=config.ce_weight, ignore_index=255
+        )
     else:
         criterion = nn.CrossEntropyLoss(reduction="mean", ignore_index=255)
 
@@ -150,12 +152,14 @@ with Engine(custom_parser=parser) as engine:
             # per-batch downweight if tile is overwhelmingly positive
             try:
                 # exclude ignore_index (255) from the positive fraction calculation
-                valid_mask = (gts != 255)
+                valid_mask = gts != 255
                 valid_count = float(valid_mask.float().sum().item())
                 if valid_count == 0:
                     pos_frac = 0.0
                 else:
-                    pos_frac = float(((gts > 0) & valid_mask).float().sum().item() / valid_count)
+                    pos_frac = float(
+                        ((gts > 0) & valid_mask).float().sum().item() / valid_count
+                    )
             except Exception:
                 pos_frac = 0.0
             if pos_frac >= config.full_pos_frac_threshold:
@@ -191,7 +195,8 @@ with Engine(custom_parser=parser) as engine:
                     "Epoch {}/{}".format(epoch, config.nepochs)
                     + " Iter {}/{}:".format(idx + 1, config.niters_per_epoch)
                     + " lr=%.4e" % lr
-                    + " loss=%.4f total_loss=%.4f" % (loss.item(), (sum_loss / (idx + 1)))
+                    + " loss=%.4f total_loss=%.4f"
+                    % (loss.item(), (sum_loss / (idx + 1)))
                 )
 
             del loss
