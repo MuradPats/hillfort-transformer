@@ -230,12 +230,27 @@ class DiceCrossEntropyLoss(nn.Module):
         dice_weight: weight for Dice term
         ce_weight: weight for CrossEntropy term
         ignore_index: ignore label
+        weight: optional sequence of class weights for CrossEntropy (len == n_classes)
     """
 
-    def __init__(self, dice_weight: float = 1.0, ce_weight: float = 1.0, ignore_index: int = 255):
+    def __init__(
+        self,
+        dice_weight: float = 1.0,
+        ce_weight: float = 1.0,
+        ignore_index: int = 255,
+        weight=None,
+    ):
         super(DiceCrossEntropyLoss, self).__init__()
         self.dice = DiceLoss(ignore_index=ignore_index)
-        self.ce = nn.CrossEntropyLoss(ignore_index=ignore_index)
+        # allow passing Python list/ndarray or torch Tensor as class weights
+        if weight is not None:
+            try:
+                w_tensor = torch.tensor(weight, dtype=torch.float)
+            except Exception:
+                w_tensor = None
+        else:
+            w_tensor = None
+        self.ce = nn.CrossEntropyLoss(ignore_index=ignore_index, weight=w_tensor)
         self.dice_weight = float(dice_weight)
         self.ce_weight = float(ce_weight)
 

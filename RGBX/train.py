@@ -54,8 +54,26 @@ with Engine(custom_parser=parser) as engine:
     # config network and criterion
     # Use 255 as ignore_index (safe sentinel not present in remapped 0/1 masks)
     if getattr(config, "loss_type", "dice_ce") == "dice_ce":
+        # Compute class weights if oversampling positives is enabled in config.
+        # Default: no class weighting (None). If oversampling is enabled, upweight
+        # the positive class according to `positive_oversample_factor`.
+        weight = None
+        try:
+            if getattr(config, "oversample_positives", False):
+                pos_factor = float(getattr(config, "positive_oversample_factor", 1.0))
+                # weight format is [w_background, w_positive]
+                raw = [1.0, float(pos_factor)]
+                # Normalize to mean=1 to keep overall CE scale stable
+                mean_w = float(sum(raw)) / len(raw)
+                weight = [w / mean_w for w in raw]
+        except Exception:
+            weight = None
+
         criterion = DiceCrossEntropyLoss(
-            dice_weight=config.dice_weight, ce_weight=config.ce_weight, ignore_index=255
+            dice_weight=config.dice_weight,
+            ce_weight=config.ce_weight,
+            ignore_index=255,
+            weight=weight,
         )
     else:
         criterion = nn.CrossEntropyLoss(reduction="mean", ignore_index=255)

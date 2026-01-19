@@ -76,8 +76,8 @@ C.lr = 6e-5
 C.lr_power = 0.9
 C.momentum = 0.9
 C.weight_decay = 0.01
-C.batch_size = 2  # 8
-C.nepochs = 10  # 50
+C.batch_size = 16  # 8
+C.nepochs = 30  # 50
 C.niters_per_epoch = C.num_train_imgs // C.batch_size + 1
 C.num_workers = 0  # 4
 C.train_scale_array = [0.5, 0.75, 1, 1.25, 1.5, 1.75]
@@ -86,7 +86,15 @@ C.warm_up_epoch = 10
 # Stratified sampling settings (optional)
 # path to folder containing neg.txt, small_pos.txt, mid_pos.txt, full_pos.txt
 C.stratified_buckets_dir = C.root_dir + "/datasets/" + C.dataset_name
-C.stratified_proportions = [0.5, 0.4, 0.09, 0.01]
+# Adjust sampling proportions to upweight positive samples (neg, small, mid, full)
+# Default was [0.5, 0.4, 0.09, 0.01] which led to very few positive tiles in batches.
+# New proportions increase the share of positive buckets so training sees more positives.
+C.stratified_proportions = [0.5, 0.25, 0.15, 0.10]
+# Toggle to indicate we explicitly want to oversample positives; training/sampler
+# code can read this flag to apply oversampling or duplication of positive entries.
+C.oversample_positives = True
+# Optional: factor by which to oversample positive buckets (1=no change)
+C.positive_oversample_factor = 5
 # Loss settings
 C.loss_type = "dice_ce"
 C.dice_weight = 1.0
