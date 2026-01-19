@@ -5,23 +5,27 @@ import time
 import numpy as np
 from easydict import EasyDict as edict
 import argparse
+from pathlib import Path
+
 
 C = edict()
 config = C
 cfg = C
 
+# Random seed
 C.seed = 12345
 
-remoteip = os.popen("pwd").read()
-C.root_dir = os.path.abspath(os.path.join(os.getcwd(), "./"))
-C.abs_dir = osp.realpath(".")
+# Repository root: compute from this file's location so config is independent of CWD
+REPO_ROOT = Path(__file__).resolve().parents[1]
+C.root_dir = str(REPO_ROOT)
+# Absolute dir (kept for backward compatibility)
+C.abs_dir = osp.realpath(str(REPO_ROOT))
 
 # Dataset config
-"""Dataset Path"""
-# Configure for the local HillfortMVP dataset
-C.dataset_name = "HillfortMVP"
-C.dataset_path = osp.join(C.root_dir, "datasets", "HillfortMVP")
+C.dataset_name = "HillfortDataSet"
+C.dataset_path = osp.join(C.root_dir, "datasets", C.dataset_name)
 # RGB imagery (tiles) — adjust format if your tiles are .tif or .jpg
+# Paths are absolute and resolved from the repository root
 C.rgb_root_folder = osp.join(C.dataset_path, "RGB")
 C.rgb_format = ".png"
 # Ground-truth masks (single-channel PNGs)
@@ -81,7 +85,7 @@ C.warm_up_epoch = 10
 
 # Stratified sampling settings (optional)
 # path to folder containing neg.txt, small_pos.txt, mid_pos.txt, full_pos.txt
-C.stratified_buckets_dir = C.root_dir + "/datasets/HillfortMVP/"
+C.stratified_buckets_dir = C.root_dir + "/datasets/" + C.dataset_name
 C.stratified_proportions = [0.5, 0.4, 0.09, 0.01]
 # Loss settings
 C.loss_type = "dice_ce"
