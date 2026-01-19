@@ -5,13 +5,14 @@ import urllib.parse
 import logging
 from bs4 import BeautifulSoup
 import re
-from tqdm import tqdm # Loading bars
+from tqdm import tqdm  # Loading bars
 from http.client import IncompleteRead
 import time
 import socket
 from urllib.parse import urlparse, parse_qs
+import argparse
 
-socket.setdefaulttimeout(30) # Longer timeout
+socket.setdefaulttimeout(30)  # Longer timeout
 
 # Configure logging for Jupyter Notebook
 logging.basicConfig(
@@ -19,11 +20,13 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
         logging.StreamHandler()  # Direct logs to the notebook's output
-    ]
+    ],
 )
-#helpers
+
+
+# helpers
 def sanitize_filename(s):
-    return "".join(c for c in s if c.isalnum() or c in (' ', '_', '-')).rstrip()
+    return "".join(c for c in s if c.isalnum() or c in (" ", "_", "-")).rstrip()
 
 
 def extract_f_from_href(href: str):
@@ -32,7 +35,10 @@ def extract_f_from_href(href: str):
     qs = parse_qs(parsed.query)
     return qs.get("f", [None])[0]
 
-def find_file_link_for_ruudunumber(html_content: str, ruudunumber: str, allowed_ext=None):
+
+def find_file_link_for_ruudunumber(
+    html_content: str, ruudunumber: str, allowed_ext=None
+):
     soup = BeautifulSoup(html_content, "html.parser")
     for a in soup.find_all("a", href=True):
         href = a["href"]
@@ -63,7 +69,7 @@ def download_with_retries(url, file_path, retries=3, delay=2):
         try:
             logging.debug(f"Attempt {attempt + 1} to download {url}")
             response = urllib.request.urlopen(url)
-            with open(file_path, 'wb') as file:
+            with open(file_path, "wb") as file:
                 file.write(response.read())
             logging.debug(f"Download successful: {file_path}")
             return  # Exit after successful download
@@ -75,30 +81,32 @@ def download_with_retries(url, file_path, retries=3, delay=2):
             time.sleep(delay)
     logging.debug(f"Failed to download {url} after {retries} attempts.")
 
+
 # url searches for files
 def get_tava_file_url(ruudunumber):
-    base_url = 'https://geoportaal.maaamet.ee/index.php'
+    base_url = "https://geoportaal.maaamet.ee/index.php"
     params = {
-        'lang_id': '1',
-        'plugin_act': 'otsing',
-        'kaardiruut': ruudunumber,
-        'andmetyyp': 'lidar_laz_tava',
-        'page_id': '614'
+        "lang_id": "1",
+        "plugin_act": "otsing",
+        "kaardiruut": ruudunumber,
+        "andmetyyp": "lidar_laz_tava",
+        "page_id": "614",
     }
     url = f"{base_url}?{urllib.parse.urlencode(params)}"
     response = urllib.request.urlopen(url)
-    html_content = response.read().decode('utf-8')
-    soup = BeautifulSoup(html_content, 'html.parser')
-    links = soup.find_all('a', href=True)
+    html_content = response.read().decode("utf-8")
+    soup = BeautifulSoup(html_content, "html.parser")
+    links = soup.find_all("a", href=True)
     for link in links:
-        if 'tava.laz' in link['href']:
-            match = re.search(fr'{ruudunumber}_(\d+)_tava\.laz', link['href'])
+        if "tava.laz" in link["href"]:
+            match = re.search(rf"{ruudunumber}_(\d+)_tava\.laz", link["href"])
             if match:
                 file_name = match[0]
                 file_link = f"https://geoportaal.maaamet.ee/?{link['href']}"
-                logging.debug(f'match found, returning: {match[0]} and {file_link}')
+                logging.debug(f"match found, returning: {match[0]} and {file_link}")
                 return file_name, file_link
-            
+
+
 def get_dtm_file_url(ruudunumber):
     base_url = "https://geoportaal.maaamet.ee/index.php"
     params = {
@@ -112,7 +120,9 @@ def get_dtm_file_url(ruudunumber):
     html_content = urllib.request.urlopen(url).read().decode("utf-8")
 
     # If you want to be strict, keep only the exact file:
-    fname, link = find_file_link_for_ruudunumber(html_content, ruudunumber, allowed_ext=[".tif"])
+    fname, link = find_file_link_for_ruudunumber(
+        html_content, ruudunumber, allowed_ext=[".tif"]
+    )
     if fname and fname.endswith("_dtm_1m.tif"):
         return fname, link
     return None, None
@@ -130,12 +140,14 @@ def get_reljeef_file_url(ruudunumber):
     url = f"{base_url}?{urllib.parse.urlencode(params)}"
     html_content = urllib.request.urlopen(url).read().decode("utf-8")
 
-    fname, link = find_file_link_for_ruudunumber(html_content, ruudunumber, allowed_ext=[".tif"])
+    fname, link = find_file_link_for_ruudunumber(
+        html_content, ruudunumber, allowed_ext=[".tif"]
+    )
     # Your example is 54333_shade.tif; enforce that if you want:
     if fname and fname.endswith("_shade.tif"):
         return fname, link
     return None, None
- 
+
 
 def get_orto_file_url(ruudunumber):
     base_url = "https://geoportaal.maaamet.ee/index.php"
@@ -150,20 +162,22 @@ def get_orto_file_url(ruudunumber):
     html_content = urllib.request.urlopen(url).read().decode("utf-8")
 
     return find_file_link_for_ruudunumber(
-        html_content,
-        ruudunumber,
-        allowed_ext=[".zip"]
+        html_content, ruudunumber, allowed_ext=[".zip"]
     )
 
-#download and save the files
+
+# download and save the files
+
 
 def ensure_dir(path: str):
     if path and not os.path.exists(path):
         os.makedirs(path, exist_ok=True)
         logging.info(f"Created output directory: {path}")
 
+
 def already_downloaded(output_dir: str, filename: str) -> bool:
     return os.path.exists(os.path.join(output_dir, filename))
+
 
 def download_one(get_url_fn, ruudunumber: str, output_dir: str, sleep_s: float = 0.5):
     """
@@ -180,7 +194,9 @@ def download_one(get_url_fn, ruudunumber: str, output_dir: str, sleep_s: float =
     time.sleep(sleep_s)  # reduce query rate
 
     if not url or not fname:
-        logging.debug(f"No file found for ruudunumber {ruudunumber} using {get_url_fn.__name__}")
+        logging.debug(
+            f"No file found for ruudunumber {ruudunumber} using {get_url_fn.__name__}"
+        )
         return False
 
     if already_downloaded(output_dir, fname):
@@ -191,6 +207,7 @@ def download_one(get_url_fn, ruudunumber: str, output_dir: str, sleep_s: float =
     download_with_retries(url, out_path)
     logging.info(f"Downloaded: {out_path}")
     return True
+
 
 def process_csv(
     input_csv,
@@ -214,10 +231,10 @@ def process_csv(
     # - laz uses 1:2000 -> row[1]
     # - others use 1:10000 -> row[2]
     dataset_plan = {
-        "laz":     (get_tava_file_url,     1),
-        "dtm":     (get_dtm_file_url,      2),
-        "reljeef": (get_reljeef_file_url,  2),
-        "orto":    (get_orto_file_url,     2),
+        "laz": (get_tava_file_url, 1),
+        "dtm": (get_dtm_file_url, 2),
+        "reljeef": (get_reljeef_file_url, 2),
+        "orto": (get_orto_file_url, 2),
     }
 
     # Make dirs (only those enabled)
@@ -228,7 +245,7 @@ def process_csv(
     total_downloaded = 0
     total_skipped_or_missing = 0
 
-    with open(input_csv, newline='', encoding='utf-8') as csvfile:
+    with open(input_csv, newline="", encoding="utf-8") as csvfile:
         reader = csv.reader(csvfile)
         header = next(reader, None)  # skip header
 
@@ -246,11 +263,15 @@ def process_csv(
 
             # Parse both columns into lists (support "463636, 462636" etc.)
             ruut_2000_list = [x.strip() for x in ruut_2000_raw.split(",") if x.strip()]
-            ruut_10000_list = [x.strip() for x in ruut_10000_raw.split(",") if x.strip()]
+            ruut_10000_list = [
+                x.strip() for x in ruut_10000_raw.split(",") if x.strip()
+            ]
 
             # If both missing, nothing to do
             if not ruut_2000_list and not ruut_10000_list:
-                logging.debug(f"Skipping line {row_number} ({linnamagi_name}): both ruudunumbers missing.")
+                logging.debug(
+                    f"Skipping line {row_number} ({linnamagi_name}): both ruudunumbers missing."
+                )
                 continue
 
             # For each dataset: pick the right list, download for each ruudunumber
@@ -270,7 +291,9 @@ def process_csv(
 
                 for ruudunumber in ruut_list:
                     try:
-                        did = download_one(get_fn, ruudunumber, out_dir, sleep_s=sleep_s)
+                        did = download_one(
+                            get_fn, ruudunumber, out_dir, sleep_s=sleep_s
+                        )
                         if did:
                             total_downloaded += 1
                         else:
@@ -285,3 +308,49 @@ def process_csv(
 
     logging.info(f"Total downloaded files: {total_downloaded}")
     logging.info(f"Total skipped/missing/errors: {total_skipped_or_missing}")
+
+
+def _arg_to_none(v: str):
+    """Interpret common CLI 'none' values as Python None."""
+    if v is None:
+        return None
+    vs = v.strip().lower()
+    if vs in ("none", "null", "", "-"):
+        return None
+    return v
+
+
+def main() -> None:
+    """CLI entrypoint for downloading datasets from geoportaal.
+
+    Usage examples:
+      python data/raw/download_maps.py data/linnamagede_ruudunumbrid_v2.csv \
+        --dtm data/dtm/ --orto data/orto/ --sleep 0.5
+
+    All dataset output args accept the string 'None' (case-insensitive) to disable
+    that dataset.
+    """
+    parser = argparse.ArgumentParser(
+        description="Download DTM and ortho files listed in a CSV of ruudunumbers."
+    )
+    parser.add_argument("input_csv", help="Input CSV with ruudunumbers")
+    parser.add_argument("--laz", default="None", help="Output dir for LAZ (or 'None' to disable)")
+    parser.add_argument("--dtm", default="data/dtm/", help="Output dir for DTM (or 'None' to disable)")
+    parser.add_argument("--reljeef", default="None", help="Output dir for reljeef (or 'None' to disable)")
+    parser.add_argument("--orto", default="data/orto/", help="Output dir for orto (or 'None' to disable)")
+    parser.add_argument("--sleep", type=float, default=0.5, dest="sleep_s", help="Seconds to sleep between queries")
+
+    args = parser.parse_args()
+
+    output_dirs = {
+        "laz": _arg_to_none(args.laz),
+        "dtm": _arg_to_none(args.dtm),
+        "reljeef": _arg_to_none(args.reljeef),
+        "orto": _arg_to_none(args.orto),
+    }
+
+    process_csv(args.input_csv, output_dirs, sleep_s=args.sleep_s)
+
+
+if __name__ == "__main__":
+    main()
