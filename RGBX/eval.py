@@ -103,7 +103,17 @@ if __name__ == "__main__":
 
     # Create the same criterion type as used during training so the model's
     # state_dict keys match (training saved criterion parameters inside the model).
-    criterion = DiceCrossEntropyLoss(dice_weight=config.dice_weight, ce_weight=config.ce_weight, ignore_index=255, weight=None)
+    weight = None
+    try:
+        if getattr(config, "oversample_positives", False):
+            pos_factor = float(getattr(config, "positive_oversample_factor", 1.0))
+            raw = [1.0, float(pos_factor)]
+            mean_w = float(sum(raw)) / len(raw)
+            weight = [w / mean_w for w in raw]
+    except Exception:
+        weight = None
+
+    criterion = DiceCrossEntropyLoss(dice_weight=config.dice_weight, ce_weight=config.ce_weight, ignore_index=255, weight=weight)
     network = segmodel(cfg=config, criterion=criterion, norm_layer=nn.BatchNorm2d)
     data_setting = {
         "rgb_root": config.rgb_root_folder,
