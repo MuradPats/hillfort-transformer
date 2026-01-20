@@ -4,15 +4,15 @@
 #SBATCH --output=/gpfs/helios/home/sandersa/transformers/slurm_outputs/slurm-%x.%j.out
 #SBATCH -N 1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=4
+#SBATCH --cpus-per-task=8
 #SBATCH -t 04:00:00
-#SBATCH --mem=6G
+#SBATCH --mem=4G
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:tesla:1
 
 # Uncomment and set your email if you want notifications
-#SBATCH --mail-type=END,FAIL
-#SBATCH --mail-user=sander.saska@ut.ee
+##SBATCH --mail-type=END,FAIL
+##SBATCH --mail-user=sander.saska@ut.ee
 
 set -euo pipefail
 
@@ -47,7 +47,7 @@ cd "$REPO_ROOT" || { echo "Failed to cd to repo root $REPO_ROOT"; exit 1; }
 
 # Default evaluation args if none provided: use GPU device 0
 if [ "$#" -eq 0 ]; then
-  ARGS=("-d" "0", "-p" "$REPO_ROOT/eval")
+  ARGS=("-d" "0" "-p" "$REPO_ROOT/eval")
 else
   ARGS=("$@")
 fi

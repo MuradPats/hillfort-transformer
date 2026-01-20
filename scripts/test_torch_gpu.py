@@ -7,6 +7,7 @@ Usage:
   python scripts/test_torch_gpu.py        # basic info
   python scripts/test_torch_gpu.py --verbose
 """
+
 from __future__ import annotations
 
 import argparse
@@ -16,7 +17,9 @@ from typing import Any
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Test PyTorch and GPU availability")
-    parser.add_argument("--verbose", "-v", action="store_true", help="Show detailed device properties")
+    parser.add_argument(
+        "--verbose", "-v", action="store_true", help="Show detailed device properties"
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -49,7 +52,10 @@ def main(argv: list[str] | None = None) -> int:
                 try:
                     props = torch.cuda.get_device_properties(i)
                     print("  - major/minor:", props.major, props.minor)
-                    print("  - total_memory (GB):", round(props.total_memory / (1024 ** 3), 2))
+                    print(
+                        "  - total_memory (GB):",
+                        round(props.total_memory / (1024**3), 2),
+                    )
                 except Exception as e:
                     print("  - failed to read properties:", e)
 

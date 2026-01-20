@@ -16,6 +16,7 @@ Options:
 The script detects the repository root relative to its own location and
 resolves the default `data/orto` path accordingly.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -41,7 +42,9 @@ def extract_zip(zip_path: Path, dest_dir: Path, overwrite: bool = False) -> int:
             try:
                 target.relative_to(dest_dir)
             except Exception:
-                logger.warning("Skipping suspicious member %s in %s", member.filename, zip_path)
+                logger.warning(
+                    "Skipping suspicious member %s in %s", member.filename, zip_path
+                )
                 continue
 
             if target.exists() and not overwrite:
@@ -58,11 +61,26 @@ def extract_zip(zip_path: Path, dest_dir: Path, overwrite: bool = False) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Extract .zip files in the orto folder using Python.")
-    parser.add_argument("--path", type=str, default=None, help="Path to orto folder (default: repo/data/orto)")
-    parser.add_argument("--overwrite", action="store_true", help="Overwrite existing files")
-    parser.add_argument("--dry-run", action="store_true", help="List files to extract but don't write them")
-    parser.add_argument("--verbose", "-v", action="count", default=0, help="Increase verbosity")
+    parser = argparse.ArgumentParser(
+        description="Extract .zip files in the orto folder using Python."
+    )
+    parser.add_argument(
+        "--path",
+        type=str,
+        default=None,
+        help="Path to orto folder (default: repo/data/orto)",
+    )
+    parser.add_argument(
+        "--overwrite", action="store_true", help="Overwrite existing files"
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="List files to extract but don't write them",
+    )
+    parser.add_argument(
+        "--verbose", "-v", action="count", default=0, help="Increase verbosity"
+    )
 
     args = parser.parse_args(argv)
 
