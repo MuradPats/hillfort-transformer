@@ -45,7 +45,7 @@ class SegEvaluator(Evaluator):
 
             # save colored result
             result_img = Image.fromarray(pred.astype(np.uint8), mode="P")
-            class_colors = get_class_colors()
+            class_colors = self.dataset.get_class_colors()
             palette_list = list(np.array(class_colors).flat)
             if len(palette_list) < 768:
                 palette_list += [0] * (768 - len(palette_list))
