@@ -94,7 +94,7 @@ C.stratified_proportions = [0.5, 0.25, 0.15, 0.10]
 # code can read this flag to apply oversampling or duplication of positive entries.
 C.oversample_positives = True
 # Optional: factor by which to oversample positive buckets (1=no change)
-C.positive_oversample_factor = 5
+C.positive_oversample_factor = 3
 # Loss settings
 C.loss_type = "dice_ce"
 C.dice_weight = 1.0
