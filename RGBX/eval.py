@@ -2,6 +2,7 @@ import os
 import cv2
 import argparse
 import numpy as np
+from PIL import Image
 
 import torch
 import torch.nn as nn
