@@ -14,6 +14,7 @@ from engine.logger import get_logger
 from utils.metric import hist_info, compute_score
 from dataloader.RGBXDataset import RGBXDataset
 from models.builder import EncoderDecoder as segmodel
+from utils.loss_opr import DiceCrossEntropyLoss
 from dataloader.dataloader import ValPre
 
 logger = get_logger()
@@ -100,7 +101,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
     all_dev = parse_devices(args.devices)
 
-    network = segmodel(cfg=config, criterion=None, norm_layer=nn.BatchNorm2d)
+    # Create the same criterion type as used during training so the model's
+    # state_dict keys match (training saved criterion parameters inside the model).
+    criterion = DiceCrossEntropyLoss(dice_weight=config.dice_weight, ce_weight=config.ce_weight, ignore_index=255, weight=None)
+    network = segmodel(cfg=config, criterion=criterion, norm_layer=nn.BatchNorm2d)
     data_setting = {
         "rgb_root": config.rgb_root_folder,
         "rgb_format": config.rgb_format,
