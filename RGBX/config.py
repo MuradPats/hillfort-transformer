@@ -76,8 +76,8 @@ C.lr = 6e-5
 C.lr_power = 0.9
 C.momentum = 0.9
 C.weight_decay = 0.01
-C.batch_size = 16  # 8
-C.nepochs = 30  # 50
+C.batch_size = 8  # 8
+C.nepochs = 20  # 50
 C.niters_per_epoch = C.num_train_imgs // C.batch_size + 1
 C.num_workers = 0  # 4
 C.train_scale_array = [0.5, 0.75, 1, 1.25, 1.5, 1.75]
@@ -94,7 +94,7 @@ C.stratified_proportions = [0.5, 0.25, 0.15, 0.10]
 # code can read this flag to apply oversampling or duplication of positive entries.
 C.oversample_positives = True
 # Optional: factor by which to oversample positive buckets (1=no change)
-C.positive_oversample_factor = 5
+C.positive_oversample_factor = 3
 # Use pixel-level weights computed from `tile_stats.csv` when available.
 # If True, training computes class weights from per-tile positive counts
 # for the training split. Set to False to fall back to tile-count-based weighting.
