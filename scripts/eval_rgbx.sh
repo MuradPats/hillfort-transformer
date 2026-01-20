@@ -4,7 +4,7 @@
 #SBATCH --output=/gpfs/helios/home/sandersa/transformers/slurm_outputs/slurm-%x.%j.out
 #SBATCH -N 1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=6
 #SBATCH -t 04:00:00
 #SBATCH --mem=4G
 #SBATCH --partition=gpu
