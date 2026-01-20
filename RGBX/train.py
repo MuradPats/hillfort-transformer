@@ -3,6 +3,7 @@ import os
 import sys
 import time
 import argparse
+from pathlib import Path
 from tqdm import tqdm
 
 import torch
@@ -54,20 +55,156 @@ with Engine(custom_parser=parser) as engine:
     # config network and criterion
     # Use 255 as ignore_index (safe sentinel not present in remapped 0/1 masks)
     if getattr(config, "loss_type", "dice_ce") == "dice_ce":
-        # Compute class weights if oversampling positives is enabled in config.
-        # Default: no class weighting (None). If oversampling is enabled, upweight
-        # the positive class according to `positive_oversample_factor`.
+        # Compute class weights when oversampling positives is enabled.
+        # Prefer deriving weights from stratified bucket counts (neg vs positive)
+        # if `stratified_buckets_dir` exists; otherwise fall back to
+        # `positive_oversample_factor` for a simple upweight.
         weight = None
         try:
-            if getattr(config, "oversample_positives", False):
-                pos_factor = float(getattr(config, "positive_oversample_factor", 1.0))
-                # weight format is [w_background, w_positive]
-                raw = [1.0, float(pos_factor)]
-                # Normalize to mean=1 to keep overall CE scale stable
-                mean_w = float(sum(raw)) / len(raw)
-                weight = [w / mean_w for w in raw]
+            # If enabled, try computing pixel-level weights from a tile_stats.csv file.
+            if getattr(config, "use_pixel_weights", False):
+                try:
+                    # candidate locations for tile_stats.csv
+                    candidates = [
+                        Path(getattr(config, "dataset_path", "")) / "tile_stats.csv",
+                        Path(getattr(config, "root_dir", "")) / "tile_stats.csv",
+                    ]
+                    csv_path = None
+                    for c in candidates:
+                        if c and c.exists():
+                            csv_path = c
+                            break
+
+                    if csv_path is not None:
+                        import csv
+
+                        # load optional train stems to restrict to training split
+                        train_set = None
+                        try:
+                            ts = Path(getattr(config, "train_source", ""))
+                            if ts and ts.exists():
+                                with open(ts, "r") as f:
+                                    train_set = set(
+                                        line.strip() for line in f if line.strip()
+                                    )
+                        except Exception:
+                            train_set = None
+
+                        pos_pixels = 0
+                        tile_count = 0
+                        with open(csv_path, newline="") as csvfile:
+                            reader = csv.DictReader(csvfile)
+                            for row in reader:
+                                # column expected: 'rgb_tile' and 'positive_count'
+                                rgb_name = (
+                                    row.get("rgb_tile")
+                                    or row.get("image")
+                                    or row.get("image_base")
+                                )
+                                pos_cnt = (
+                                    row.get("positive_count")
+                                    or row.get("positive_pixels")
+                                    or row.get("positive")
+                                )
+                                try:
+                                    pos_val = (
+                                        int(float(pos_cnt))
+                                        if pos_cnt not in (None, "")
+                                        else 0
+                                    )
+                                except Exception:
+                                    pos_val = 0
+
+                                # derive stem (without extension) to compare with train list
+                                stem = None
+                                if isinstance(rgb_name, str):
+                                    stem = Path(rgb_name).stem
+
+                                if train_set is not None:
+                                    if stem is None or stem not in train_set:
+                                        continue
+
+                                pos_pixels += pos_val
+                                tile_count += 1
+
+                        if tile_count > 0:
+                            # assume uniform tile size; compute total pixels
+                            pixels_per_tile = int(
+                                getattr(config, "image_height", 512)
+                            ) * int(getattr(config, "image_width", 512))
+                            total_pixels = float(tile_count * pixels_per_tile)
+                            neg_pixels = max(total_pixels - float(pos_pixels), 1.0)
+                            pos_pixels = max(float(pos_pixels), 1.0)
+
+                            w_neg = total_pixels / neg_pixels
+                            w_pos = total_pixels / pos_pixels
+
+                            # normalize mean to 1 to keep CE scale stable
+                            mean_w = (w_neg + w_pos) / 2.0
+                            # clip extreme weights
+                            max_w = float(getattr(config, "max_class_weight", 100.0))
+                            w_neg = min(w_neg / mean_w, max_w)
+                            w_pos = min(w_pos / mean_w, max_w)
+                            weight = [w_neg, w_pos]
+                except Exception:
+                    weight = None
+
+            # If pixel weights not produced, fall back to bucket-count weighting
+            if weight is None and getattr(config, "oversample_positives", False):
+                # Try bucket-based weighting
+                try:
+                    buckets_dir = Path(getattr(config, "stratified_buckets_dir", ""))
+                    if buckets_dir and buckets_dir.exists():
+
+                        def read_count(name):
+                            p = buckets_dir / name
+                            if not p.exists():
+                                return 0
+                            with open(p, "r") as f:
+                                return sum(1 for ln in f if ln.strip())
+
+                        neg_n = read_count("neg.txt")
+                        small_n = read_count("small_pos.txt")
+                        mid_n = read_count("mid_pos.txt")
+                        full_n = read_count("full_pos.txt")
+                        pos_n = small_n + mid_n + full_n
+
+                        if neg_n > 0 and pos_n > 0:
+                            total = float(neg_n + pos_n)
+                            # inverse-frequency weighting
+                            w_neg = total / float(neg_n)
+                            w_pos = total / float(pos_n)
+                            # normalize to mean=1 to keep CE scale stable (matching prior behaviour)
+                            mean_w = (w_neg + w_pos) / 2.0
+                            weight = [w_neg / mean_w, w_pos / mean_w]
+                except Exception:
+                    weight = None
+
+                # Fallback: scalar oversample factor (kept for backward compatibility)
+                if weight is None:
+                    pos_factor = float(
+                        getattr(config, "positive_oversample_factor", 1.0)
+                    )
+                    raw = [1.0, float(pos_factor)]
+                    mean_w = float(sum(raw)) / len(raw)
+                    weight = [w / mean_w for w in raw]
         except Exception:
             weight = None
+
+        # Clamp computed class weights to configured min/max to avoid extremes
+        if weight is not None:
+            try:
+                max_w = float(getattr(config, "max_class_weight", 100.0))
+                min_w = float(getattr(config, "min_class_weight", 0.0))
+                # ensure sensible ordering
+                if min_w > max_w:
+                    min_w = max_w
+
+                weight = [float(weight[0]), float(weight[1])]
+                weight[0] = min(max(weight[0], min_w), max_w)
+                weight[1] = min(max(weight[1], min_w), max_w)
+            except Exception:
+                pass
 
         criterion = DiceCrossEntropyLoss(
             dice_weight=config.dice_weight,
