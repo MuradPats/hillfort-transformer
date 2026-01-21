@@ -256,10 +256,29 @@ with Engine(custom_parser=parser) as engine:
         config.niters_per_epoch * config.warm_up_epoch,
     )
 
+    def _move_optimizer_state(optimizer, device):
+        # Move optimizer state tensors to the given device (in-place).
+        for state in optimizer.state.values():
+            for k, v in list(state.items()):
+                if isinstance(v, torch.Tensor):
+                    try:
+                        state[k] = v.to(device)
+                    except Exception:
+                        # best-effort move; skip if it fails
+                        pass
+
+    # Register state and restore checkpoint (if any) while model/optimizer
+    # parameters/optimizer states are still on CPU to avoid GPU spikes.
+    engine.register_state(dataloader=train_loader, model=model, optimizer=optimizer)
+    if engine.continue_state_object:
+        engine.restore_checkpoint()
+
     if engine.distributed:
         logger.info(".............distributed training.............")
         if torch.cuda.is_available():
             model.cuda()
+            # move optimizer state to the local GPU device
+            _move_optimizer_state(optimizer, torch.device("cuda", engine.local_rank))
             model = DistributedDataParallel(
                 model,
                 device_ids=[engine.local_rank],
@@ -268,11 +287,9 @@ with Engine(custom_parser=parser) as engine:
             )
     else:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # move model and optimizer state to chosen device
         model.to(device)
-
-    engine.register_state(dataloader=train_loader, model=model, optimizer=optimizer)
-    if engine.continue_state_object:
-        engine.restore_checkpoint()
+        _move_optimizer_state(optimizer, device)
 
     optimizer.zero_grad()
     model.train()
