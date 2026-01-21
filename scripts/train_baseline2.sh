@@ -23,7 +23,7 @@ source "$PROJECT_ROOT/venv/bin/activate"
 
 cd "$REPO_ROOT"
 
-python baseline2/train.py \
+python -m baseline2.train \
   --dataset-root "$REPO_ROOT/datasets/HillfortDataSet" \
   --batch-size 8 \
   --epochs 1 \
