@@ -9,8 +9,8 @@ Usage (defaults chosen for this repo layout):
 The script will iterate all .tif files under `--ortho-dir`, find matching rows
 in the CSV by tile stem (column `Ruudunumber(1:10000)` by default), collect the
 INSPIRE ids from the CSV column `INSPIRE id`, filter the shapefile GeoDataFrame
-by that id, rasterise geometries to the ortho image grid and save a 8-bit
-PNG mask with values 0 (background) and 255 (positive).
+by that id, rasterise geometries to the ortho image grid and save an 8-bit
+PNG mask with values 0 (background) and 1 (positive).
 """
 from pathlib import Path
 import argparse
@@ -111,11 +111,13 @@ def make_mask_for_tile(tif_path: Path, map_tiles_df: pd.DataFrame, gdf, cfg,
         )
 
     # ensure output is the desired mask_size x mask_size
+    # mask_arr is 0/1 uint8; save as 0/1 (not 0/255) so downstream metrics
+    # that expect binary {0,1} work without extra conversion.
     if (height, width) != (mask_size, mask_size):
-        img = Image.fromarray((mask_arr * 255).astype(np.uint8))
+        img = Image.fromarray(mask_arr.astype(np.uint8))
         img = img.resize((mask_size, mask_size), resample=Image.NEAREST)
     else:
-        img = Image.fromarray((mask_arr * 255).astype(np.uint8))
+        img = Image.fromarray(mask_arr.astype(np.uint8))
 
     # ensure directory exists
     out_path.parent.mkdir(parents=True, exist_ok=True)

@@ -1,12 +1,12 @@
 #!/bin/bash
 # SBATCH script to run the polygon rasterisation script (create GT masks)
-#SBATCH -J rasterize_polygons_masks
+#SBATCH -J transformers_rasterize_polygons_masks
 #SBATCH --output=/gpfs/helios/home/sandersa/transformers/slurm_outputs/slurm-%x.%j.out
 #SBATCH -N 1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=4
 #SBATCH -t 02:00:00
-#SBATCH --mem=8G
+#SBATCH --mem=5G
 
 ##SBATCH --mail-type=END,FAIL
 ##SBATCH --mail-user=sander.saska@ut.ee
