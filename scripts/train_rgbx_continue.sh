@@ -1,6 +1,6 @@
 #!/bin/bash
 # SBATCH script to run RGBX training on 1 GPU
-#SBATCH -J transformers_train_rgbx
+#SBATCH -J transformers_train_rgbx_continue
 #SBATCH --output=/gpfs/helios/home/sandersa/transformers/slurm_outputs/slurm-%x.%j.out
 #SBATCH -N 1
 #SBATCH --ntasks-per-node=1
