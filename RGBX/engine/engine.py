@@ -128,15 +128,10 @@ class Engine(object):
 
     def restore_checkpoint(self):
         t_start = time.time()
-        if self.distributed:
-            # load the model on cpu first to avoid GPU RAM surge
-            # when loading a model checkpoint
-            # tmp = torch.load(self.continue_state_object,
-            #                  map_location=lambda storage, loc: storage.cuda(
-            #                      self.local_rank))
-            tmp = torch.load(self.continue_state_object, map_location=torch.device('cpu'))
-        else:
-            tmp = torch.load(self.continue_state_object)
+        # Always load checkpoint to CPU first to avoid allocating large tensors
+        # directly onto the GPU (optimizer states can be large). Loading to CPU
+        # prevents sudden GPU memory spikes when resuming.
+        tmp = torch.load(self.continue_state_object, map_location=torch.device("cpu"))
         t_ioend = time.time()
         self.state.model = load_model(self.state.model, tmp['model'], is_restore=True)
         self.state.optimizer.load_state_dict(tmp['optimizer'])
