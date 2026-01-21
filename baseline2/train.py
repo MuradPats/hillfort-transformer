@@ -9,10 +9,28 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+import os
+
+
+# VRAM debug toggle: set DEBUG_VRAM=1 in environment to enable verbose GPU memory prints
+DEBUG_VRAM = os.getenv("DEBUG_VRAM", "0") == "1"
+
+
+def _show_mem(tag: str = "") -> None:
+    if not DEBUG_VRAM:
+        return
+    if not torch.cuda.is_available():
+        print(f"[VRAM] {tag}: cuda not available")
+        return
+    torch.cuda.synchronize()
+    alloc = torch.cuda.memory_allocated() // (1024 ** 2)
+    reserved = torch.cuda.memory_reserved() // (1024 ** 2)
+    print(f"[VRAM] {tag}: allocated={alloc}MiB reserved={reserved}MiB")
 
 from baseline2.config import Config
 from baseline2.dataset import HillfortDataset
 from baseline2.model import UNetSmall
+
 
 def seed_everything(seed: int) -> None:
     random.seed(seed)
@@ -20,19 +38,23 @@ def seed_everything(seed: int) -> None:
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
 
+
 @torch.no_grad()
-def compute_iou(pred: torch.Tensor, target: torch.Tensor, num_classes: int = 2) -> float:
+def compute_iou(
+    pred: torch.Tensor, target: torch.Tensor, num_classes: int = 2
+) -> float:
     # pred/target are HxW tensors (class indices)
     ious = []
     for c in range(num_classes):
-        p = (pred == c)
-        t = (target == c)
+        p = pred == c
+        t = target == c
         inter = (p & t).sum().item()
         union = (p | t).sum().item()
         if union == 0:
             continue
         ious.append(inter / union)
     return float(np.mean(ious)) if ious else 0.0
+
 
 def main() -> None:
     parser = argparse.ArgumentParser()
@@ -66,27 +88,45 @@ def main() -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
 
-    train_ds = HillfortDataset(cfg.dataset_root, cfg.train_list, use_dtm=cfg.use_dtm, dtm_scale=cfg.dtm_scale)
-    val_ds   = HillfortDataset(cfg.dataset_root, cfg.val_list,   use_dtm=cfg.use_dtm, dtm_scale=cfg.dtm_scale)
+    train_ds = HillfortDataset(
+        cfg.dataset_root, cfg.train_list, use_dtm=cfg.use_dtm, dtm_scale=cfg.dtm_scale
+    )
+    val_ds = HillfortDataset(
+        cfg.dataset_root, cfg.val_list, use_dtm=cfg.use_dtm, dtm_scale=cfg.dtm_scale
+    )
 
     print(f"Train samples: {len(train_ds)} | Val samples: {len(val_ds)}")
 
     train_loader = DataLoader(
-        train_ds, batch_size=cfg.batch_size, shuffle=True,
-        num_workers=cfg.num_workers, pin_memory=torch.cuda.is_available()
+        train_ds,
+        batch_size=cfg.batch_size,
+        shuffle=True,
+        num_workers=cfg.num_workers,
+        pin_memory=torch.cuda.is_available(),
     )
     val_loader = DataLoader(
-        val_ds, batch_size=1, shuffle=False,
-        num_workers=max(1, cfg.num_workers // 2), pin_memory=torch.cuda.is_available()
+        val_ds,
+        batch_size=1,
+        shuffle=False,
+        num_workers=max(1, cfg.num_workers // 2),
+        pin_memory=torch.cuda.is_available(),
     )
 
     in_ch = 4 if cfg.use_dtm else 3
-    model = UNetSmall(in_channels=in_ch, num_classes=cfg.num_classes).to(device)
+    model = UNetSmall(in_channels=in_ch, num_classes=cfg.num_classes)
+    print("Model parameters:", sum(p.numel() for p in model.parameters()))
+    _show_mem("before_model_to_device")
+    model = model.to(device)
+    _show_mem("after_model_to_device")
 
     criterion = nn.CrossEntropyLoss()
-    opt = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
+    opt = torch.optim.AdamW(
+        model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay
+    )
 
-    save_dir = Path(cfg.dataset_root.parent) / cfg.dataset_root.name  # just to avoid accidental weirdness
+    save_dir = (
+        Path(cfg.dataset_root.parent) / cfg.dataset_root.name
+    )  # just to avoid accidental weirdness
     save_dir = Path(args.save_dir)
     save_dir.mkdir(parents=True, exist_ok=True)
 
@@ -98,15 +138,20 @@ def main() -> None:
         running_loss = 0.0
 
         for step, (x, y) in enumerate(train_loader, start=1):
+            _show_mem(f"epoch{epoch}_step{step}_before_move")
             x = x.to(device, non_blocking=True)
             y = y.to(device, non_blocking=True)
+            _show_mem(f"epoch{epoch}_step{step}_after_move")
 
+            _show_mem(f"epoch{epoch}_step{step}_before_forward")
             logits = model(x)
+            _show_mem(f"epoch{epoch}_step{step}_after_forward")
             loss = criterion(logits, y)
 
             opt.zero_grad(set_to_none=True)
             loss.backward()
             opt.step()
+            _show_mem(f"epoch{epoch}_step{step}_after_step")
 
             running_loss += loss.item()
             global_step += 1
@@ -127,14 +172,18 @@ def main() -> None:
 
                 logits = model(xv)
                 pred = torch.argmax(logits, dim=1).squeeze(0)  # H,W
-                iou = compute_iou(pred.cpu(), yv.squeeze(0).cpu(), num_classes=cfg.num_classes)
+                iou = compute_iou(
+                    pred.cpu(), yv.squeeze(0).cpu(), num_classes=cfg.num_classes
+                )
                 val_ious.append(iou)
 
                 if i >= 25:  # keep val quick by default
                     break
 
         mean_iou = float(np.mean(val_ious)) if val_ious else 0.0
-        print(f"Epoch {epoch}/{cfg.epochs} | loss {avg_loss:.4f} | val mIoU {mean_iou:.4f} | {dt:.1f}s")
+        print(
+            f"Epoch {epoch}/{cfg.epochs} | loss {avg_loss:.4f} | val mIoU {mean_iou:.4f} | {dt:.1f}s"
+        )
 
         ckpt = {
             "epoch": epoch,
@@ -145,6 +194,7 @@ def main() -> None:
         torch.save(ckpt, save_dir / f"ckpt_epoch_{epoch}.pt")
 
     print(f"Done. Checkpoints in: {save_dir}")
+
 
 if __name__ == "__main__":
     main()
