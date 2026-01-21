@@ -23,9 +23,10 @@ def _show_mem(tag: str = "") -> None:
         print(f"[VRAM] {tag}: cuda not available")
         return
     torch.cuda.synchronize()
-    alloc = torch.cuda.memory_allocated() // (1024 ** 2)
-    reserved = torch.cuda.memory_reserved() // (1024 ** 2)
+    alloc = torch.cuda.memory_allocated() // (1024**2)
+    reserved = torch.cuda.memory_reserved() // (1024**2)
     print(f"[VRAM] {tag}: allocated={alloc}MiB reserved={reserved}MiB")
+
 
 from baseline2.config import Config
 from baseline2.dataset import HillfortDataset

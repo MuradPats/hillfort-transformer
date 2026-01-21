@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+
 @dataclass
 class Config:
     # dataset root
@@ -16,7 +17,7 @@ class Config:
     val_list: str = "test.txt"
 
     # training
-    num_classes: int = 2            # binary by default
+    num_classes: int = 2  # binary by default
     batch_size: int = 8
     num_workers: int = 4
     lr: float = 3e-4
@@ -26,5 +27,5 @@ class Config:
     seed: int = 1337
 
     # input
-    use_dtm: bool = True            # RGB+DTM (4 channels); set False for RGB-only
-    dtm_scale: float = 1.0          # optionally scale DTM values
+    use_dtm: bool = True  # RGB+DTM (4 channels); set False for RGB-only
+    dtm_scale: float = 1.0  # optionally scale DTM values

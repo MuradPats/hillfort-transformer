@@ -10,15 +10,18 @@ from PIL import Image
 import torch
 from torch.utils.data import Dataset
 
+
 def _read_png(path: Path) -> np.ndarray:
     img = Image.open(path)
     arr = np.array(img)
     return arr
 
+
 def _read_tif(path: Path) -> np.ndarray:
     # Prefer rasterio for GeoTIFFs; fallback to PIL if needed.
     try:
         import rasterio  # type: ignore
+
         with rasterio.open(path) as src:
             arr = src.read(1)  # first band
         return arr
@@ -28,6 +31,7 @@ def _read_tif(path: Path) -> np.ndarray:
         if arr.ndim == 3:
             arr = arr[..., 0]
         return arr
+
 
 def _normalize_dtm(dtm: np.ndarray) -> np.ndarray:
     # Robust normalization per-tile (avoid NaN)
@@ -44,6 +48,7 @@ def _normalize_dtm(dtm: np.ndarray) -> np.ndarray:
     out[~finite] = 0.0
     return out.astype(np.float32)
 
+
 def _binarize_label(lbl: np.ndarray) -> np.ndarray:
     # Your masks might be 0/1 or 0/255. Make it {0,1}.
     if lbl.ndim == 3:
@@ -51,6 +56,7 @@ def _binarize_label(lbl: np.ndarray) -> np.ndarray:
     if lbl.max() > 1:
         lbl = (lbl > 0).astype(np.uint8)
     return lbl.astype(np.uint8)
+
 
 def _read_id_list(path: Path) -> List[str]:
     ids: List[str] = []
@@ -61,6 +67,7 @@ def _read_id_list(path: Path) -> List[str]:
                 continue
             ids.append(s)
     return ids
+
 
 @dataclass
 class HillfortPaths:
@@ -78,6 +85,7 @@ class HillfortPaths:
     def label_path(self, tile_id: str) -> Path:
         return self.root / self.label_dir / f"{tile_id}.png"
 
+
 class HillfortDataset(Dataset):
     def __init__(
         self,
@@ -87,11 +95,40 @@ class HillfortDataset(Dataset):
         dtm_scale: float = 1.0,
     ):
         self.paths = HillfortPaths(dataset_root)
-        self.tile_ids = _read_id_list(dataset_root / split_list_file)
+        raw_ids = _read_id_list(dataset_root / split_list_file)
+        # Expand any base image ids into their tiled parts (prefer files like
+        # 62093_x00000_y00000) so training operates on cropped tiles rather
+        # than full images. If tiles are present for a base id we use them;
+        # otherwise fall back to the id as given.
+        self.tile_ids = []
+        for tid in raw_ids:
+            # if tid already looks like a tile, keep as-is (we'll validate later)
+            if "_x" in tid and "_y" in tid:
+                self.tile_ids.append(tid)
+                continue
+
+            # search for tiled RGB files matching the base id
+            rgb_folder = dataset_root / self.paths.rgb_dir
+            # try common extensions
+            found_tiles = []
+            for ext in (".png", ".tif", ".tiff"):
+                pattern = f"{tid}_x*{ext}"
+                for p in rgb_folder.glob(pattern):
+                    # use stem (without extension) as the canonical tile id
+                    found_tiles.append(p.stem)
+            if found_tiles:
+                # sort for determinism
+                found_tiles.sort()
+                self.tile_ids.extend(found_tiles)
+            else:
+                # no tiles found for this base id — skip whole-image entries to
+                # ensure training only uses cropped tiles
+                continue
         self.use_dtm = use_dtm
         self.dtm_scale = float(dtm_scale)
 
-        # Filter out missing files early (helps avoid mid-epoch crashes)
+        # Filter out missing files early (helps avoid mid-epoch crashes).
+        # We require RGB and label; DTM is required only when requested.
         kept: List[str] = []
         for tid in self.tile_ids:
             rp = self.paths.rgb_path(tid)
@@ -102,6 +139,12 @@ class HillfortDataset(Dataset):
                 ok = ok and dp.exists()
             if ok:
                 kept.append(tid)
+            else:
+                # If a tiled id was generated above but missing required files,
+                # skip it silently (dataset may be inconsistent). For base ids
+                # that point to whole images we skip whole-image if tiles exist
+                # (we prefer tiles); otherwise keep the base id only if files exist.
+                continue
         self.tile_ids = kept
 
     def __len__(self) -> int:
@@ -121,12 +164,12 @@ class HillfortDataset(Dataset):
             dtm = _read_tif(self.paths.dtm_path(tid))  # H,W
             dtm = _normalize_dtm(dtm) * self.dtm_scale
             dtm_t = torch.from_numpy(dtm).unsqueeze(0)  # 1,H,W
-            x = torch.cat([rgb_t, dtm_t], dim=0)        # 4,H,W
+            x = torch.cat([rgb_t, dtm_t], dim=0)  # 4,H,W
         else:
             x = rgb_t  # 3,H,W
 
-        lbl = _read_png(self.paths.label_path(tid))     # H,W or H,W,?
+        lbl = _read_png(self.paths.label_path(tid))  # H,W or H,W,?
         lbl = _binarize_label(lbl)
-        y = torch.from_numpy(lbl.astype(np.int64))      # H,W (class indices)
+        y = torch.from_numpy(lbl.astype(np.int64))  # H,W (class indices)
 
         return x, y
