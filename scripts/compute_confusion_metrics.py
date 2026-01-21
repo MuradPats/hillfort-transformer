@@ -18,10 +18,9 @@ from PIL import Image
 
 
 def load_mask(path: Path):
-    img = Image.open(path).convert("L")
-    arr = np.array(img)
-    # binarize: any non-zero -> 1
-    return (arr > 0).astype(np.uint8)
+    im = Image.open(path).convert("L")
+    arr = np.asarray(im)
+    return arr > 0
 
 
 def resize_to(arr: np.ndarray, target_shape):
