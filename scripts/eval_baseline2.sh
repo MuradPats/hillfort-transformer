@@ -5,7 +5,7 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=4
 #SBATCH -t 01:00:00
-#SBATCH --mem=8G
+#SBATCH --mem=5G
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:tesla:1
 
@@ -23,8 +23,7 @@ source "$PROJECT_ROOT/venv/bin/activate"
 
 cd "$REPO_ROOT"
 
-python baseline2/eval.py \
+python -m baseline2.eval \
   --dataset-root "$REPO_ROOT/datasets/HillfortDataSet" \
   --split-list test.txt \
-  --ckpt "$REPO_ROOT/runs/baseline2/ckpt_epoch_1.pt" \
-  --limit 200
+  --ckpt "$REPO_ROOT/runs/baseline2/ckpt_epoch_10.pt"

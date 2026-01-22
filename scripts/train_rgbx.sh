@@ -5,8 +5,8 @@
 #SBATCH -N 1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=6
-#SBATCH -t 12:00:00
-#SBATCH --mem=4G
+#SBATCH -t 24:00:00
+#SBATCH --mem=5G
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:tesla:1
 

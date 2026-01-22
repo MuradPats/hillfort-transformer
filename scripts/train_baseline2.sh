@@ -4,8 +4,8 @@
 #SBATCH -N 1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=6
-#SBATCH -t 04:00:00
-#SBATCH --mem=8G
+#SBATCH -t 08:00:00
+#SBATCH --mem=4G
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:tesla:1
 
@@ -23,9 +23,11 @@ source "$PROJECT_ROOT/venv/bin/activate"
 
 cd "$REPO_ROOT"
 
-python -m baseline2.train \
+export DEBUG_VRAM=1
+
+python -u -m baseline2.train \
   --dataset-root "$REPO_ROOT/datasets/HillfortDataSet" \
-  --batch-size 8 \
-  --epochs 1 \
-  --steps-per-epoch 5 \
+  --batch-size 2 \
+  --epochs 10 \
+  --num-workers 0 \
   --save-dir "$REPO_ROOT/runs/baseline2"

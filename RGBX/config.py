@@ -72,15 +72,15 @@ C.decoder_embed_dim = 512
 C.optimizer = "AdamW"
 
 """Train Config"""
-C.lr = 6e-5
+C.lr = 3e-5
 C.lr_power = 0.9
 C.momentum = 0.9
 C.weight_decay = 0.01
-C.batch_size = 8  # 8
+C.batch_size = 4  # 8
 C.nepochs = 40  # 50
 C.niters_per_epoch = C.num_train_imgs // C.batch_size + 1
 C.num_workers = 0  # 4
-C.train_scale_array = [0.5, 0.75, 1, 1.25, 1.5, 1.75]
+C.train_scale_array = [0.8, 0.9, 1, 1.1, 1.2]
 C.warm_up_epoch = 10
 
 # Stratified sampling settings (optional)
