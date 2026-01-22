@@ -26,4 +26,5 @@ cd "$REPO_ROOT"
 python -m baseline2.eval \
   --dataset-root "$REPO_ROOT/datasets/HillfortDataSet" \
   --split-list test.txt \
-  --ckpt "$REPO_ROOT/runs/baseline2/ckpt_epoch_10.pt"
+  --ckpt "$REPO_ROOT/runs/baseline2/ckpt_epoch_10.pt" \
+  --save-path "$REPO_ROOT/runs/baseline2/eval"
