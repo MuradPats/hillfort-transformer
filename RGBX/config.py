@@ -36,7 +36,7 @@ C.gt_transform = False
 C.x_root_folder = osp.join(C.dataset_path, "DTM")
 C.x_format = ".tif"
 C.x_is_single_channel = True  # DTM is single-channel
-C.train_source = osp.join(C.dataset_path, "train.txt")
+C.train_source = osp.join(C.dataset_path, "stratified_train.txt")
 C.eval_source = osp.join(C.dataset_path, "test.txt")
 C.is_test = False
 # Auto-detect counts from train/test files when available
@@ -72,7 +72,7 @@ C.decoder_embed_dim = 512
 C.optimizer = "AdamW"
 
 """Train Config"""
-C.lr = 3e-5
+C.lr = 6e-5  # 6e-5 with batch size 8
 C.lr_power = 0.9
 C.momentum = 0.9
 C.weight_decay = 0.01
@@ -80,30 +80,29 @@ C.batch_size = 4  # 8
 C.nepochs = 40  # 50
 C.niters_per_epoch = C.num_train_imgs // C.batch_size + 1
 C.num_workers = 0  # 4
-C.train_scale_array = [0.8, 0.9, 1, 1.1, 1.2]
+C.train_scale_array = [0.9, 0.95, 1, 1.05, 1.1]
 C.warm_up_epoch = 10
 
 # Stratified sampling settings (optional)
 # path to folder containing neg.txt, small_pos.txt, mid_pos.txt, full_pos.txt
-C.stratified_buckets_dir = C.root_dir + "/datasets/" + C.dataset_name
+C.stratified_buckets_dir = None  # stratified_train.txt does that job now
 # Adjust sampling proportions to upweight positive samples (neg, small, mid, full)
 # Default was [0.5, 0.4, 0.09, 0.01] which led to very few positive tiles in batches.
-# New proportions increase the share of positive buckets so training sees more positives.
-C.stratified_proportions = [0.5, 0.25, 0.15, 0.10]
+C.stratified_proportions = [0.5, 0.3, 0.2, 0.1]
 # Toggle to indicate we explicitly want to oversample positives; training/sampler
 # code can read this flag to apply oversampling or duplication of positive entries.
 C.oversample_positives = True
 # Optional: factor by which to oversample positive buckets (1=no change)
-C.positive_oversample_factor = 3
+C.positive_oversample_factor = 1
 # Use pixel-level weights computed from `tile_stats.csv` when available.
 # If True, training computes class weights from per-tile positive counts
 # for the training split. Set to False to fall back to tile-count-based weighting.
 C.use_pixel_weights = True
 # Class-weight clipping to avoid extreme weighting from very sparse positives
 # Maximum allowed per-class weight after normalization (helps stability)
-C.max_class_weight = 50.0
+C.max_class_weight = 100.0
 # Minimum allowed per-class weight after normalization (prevents background from vanishing)
-C.min_class_weight = 0.01
+C.min_class_weight = 1e-3
 # Loss settings
 C.loss_type = "dice_ce"
 C.dice_weight = 1.0
@@ -111,7 +110,7 @@ C.ce_weight = 1.0
 
 # Per-batch downweighting for very-full tiles
 C.full_pos_frac_threshold = 0.9
-C.full_pos_downweight = 0.5
+C.full_pos_downweight = 0.75
 
 C.fix_bias = True
 C.bn_eps = 1e-3
