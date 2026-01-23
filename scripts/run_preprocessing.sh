@@ -15,9 +15,9 @@
 module load python/3.12.3
 
 # Flags to control which steps to run (1=run, 0=skip)
-RUN_BATCH=1
-RUN_RASTERIZE=1
-RUN_TILE=1
+RUN_BATCH=0
+RUN_RASTERIZE=0
+RUN_TILE=0
 RUN_STRATIFY=1
 
 # Resolve locations
