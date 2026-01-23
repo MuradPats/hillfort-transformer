@@ -85,15 +85,15 @@ C.warm_up_epoch = 10
 
 # Stratified sampling settings (optional)
 # path to folder containing neg.txt, small_pos.txt, mid_pos.txt, full_pos.txt
-C.stratified_buckets_dir = None  # stratified_train.txt does that job now
+C.stratified_buckets_dir = None  # C.root_dir + "/datasets/" + C.dataset_name
 # Adjust sampling proportions to upweight positive samples (neg, small, mid, full)
 # Default was [0.5, 0.4, 0.09, 0.01] which led to very few positive tiles in batches.
-C.stratified_proportions = [0.5, 0.3, 0.2, 0.1]
+C.stratified_proportions = [0.25, 0.25, 0.25, 0.25]
 # Toggle to indicate we explicitly want to oversample positives; training/sampler
 # code can read this flag to apply oversampling or duplication of positive entries.
 C.oversample_positives = True
 # Optional: factor by which to oversample positive buckets (1=no change)
-C.positive_oversample_factor = 1
+C.positive_oversample_factor = 2
 # Use pixel-level weights computed from `tile_stats.csv` when available.
 # If True, training computes class weights from per-tile positive counts
 # for the training split. Set to False to fall back to tile-count-based weighting.
