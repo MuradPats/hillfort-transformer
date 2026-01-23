@@ -9,6 +9,8 @@ data/raw/dtmFiles/
 data/raw/reljeefFiles/
 data/raw/ortoFiles/
 
+slurm_outputs/*
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
