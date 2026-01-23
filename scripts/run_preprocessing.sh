@@ -16,8 +16,8 @@ module load python/3.12.3
 
 # Flags to control which steps to run (1=run, 0=skip)
 RUN_BATCH=0
-RUN_RASTERIZE=0
-RUN_TILE=0
+RUN_RASTERIZE=1
+RUN_TILE=1
 RUN_STRATIFY=1
 
 # Resolve locations
@@ -91,7 +91,8 @@ if [ "$RUN_STRATIFY" -eq 1 ]; then
     --out "$REPO_ROOT/datasets/HillfortDataSet/" \
     --small-thresh 0.01647 \
     --mid-thresh 0.05634 \
-    --proportions "0.5,0.25,0.15,0.10"
+    --proportions "0.5,0.3,0.2,0.1" \
+    --mix-size 10000 \
   rc=$?
   if [ $rc -ne 0 ]; then
     echo "build_stratified_train.py failed (exit $rc)" >&2
