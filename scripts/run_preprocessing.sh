@@ -92,7 +92,7 @@ if [ "$RUN_STRATIFY" -eq 1 ]; then
     --small-thresh 0.01647 \
     --mid-thresh 0.05634 \
     --proportions "0.25,0.25,0.25,0.25" \
-    --mix-size 10000 \
+    --mix-size 10000
   rc=$?
   if [ $rc -ne 0 ]; then
     echo "build_stratified_train.py failed (exit $rc)" >&2
