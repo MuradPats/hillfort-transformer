@@ -179,8 +179,15 @@ def main():
                 # Match tile id in CSV (cast to str for robust comparison)
                 col_tile = args.map_tile_col
                 col_inspire = args.map_inspire_col
+                # Support comma-separated tile IDs in the CSV cell (e.g. "63353, 63351")
+                def _cell_to_list(cell):
+                    if cell is None:
+                        return []
+                    s = str(cell)
+                    return [x.strip() for x in s.split(",") if x.strip()]
+
                 try:
-                    matched = map_df[map_df[col_tile].astype(str) == str(tile_id)]
+                    matched = map_df[map_df[col_tile].apply(lambda c: str(tile_id) in _cell_to_list(c))]
                     inspire_ids = matched[col_inspire].dropna().astype(str).tolist()
                 except Exception:
                     inspire_ids = []
