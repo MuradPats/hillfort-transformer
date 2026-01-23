@@ -15,9 +15,9 @@ Usage examples:
 
 Options (defaults chosen for sparse targets):
   neg     : positive_fraction == 0
-  small   : 0 < f <= 0.001
-  mid     : 0.001 < f <= 0.01
-  full    : f > 0.01
+  small   : 0 < f <= 0.0165
+  mid     : 0.0165 < f <= 0.0563
+  full    : f > 0.0563
 
 You can override the thresholds with `--small-thresh` and `--mid-thresh`.
 If `--mix-size N` is provided, the script will create `stratified_train.txt`
@@ -42,11 +42,14 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--small-thresh",
         type=float,
-        default=0.001,
+        default=0.0165,
         help="Upper bound for small-pos bucket (exclusive of zero)",
     )
     p.add_argument(
-        "--mid-thresh", type=float, default=0.01, help="Upper bound for mid-pos bucket"
+        "--mid-thresh",
+        type=float,
+        default=0.0563,
+        help="Upper bound for mid-pos bucket",
     )
     p.add_argument(
         "--mix-size",
@@ -57,7 +60,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument(
         "--proportions",
         type=str,
-        default="0.5,0.4,0.09,0.01",
+        default="0.5,0.25,0.15,0.1",
         help="Comma-separated proportions for neg,small,mid,full (must sum to 1) when --mix-size used",
     )
     p.add_argument("--seed", type=int, default=42, help="Random seed for sampling")
