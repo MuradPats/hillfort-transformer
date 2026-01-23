@@ -155,8 +155,26 @@ def find_pairs(root: Path) -> list[tuple[Path, Path, Path | None]]:
     if not rgb_dir.exists() or not label_dir.exists():
         raise FileNotFoundError(f"Expected RGB and Label folders under {root}")
 
-    rgb_files = {p.stem: p for p in rgb_dir.glob("*.png")}  # adjust ext if necessary
-    label_files = {p.stem: p for p in label_dir.glob("*.png")}
+    # Avoid re-processing files that already look like tiled outputs (contain
+    # patterns like _x00000_y00000) — these would produce duplicated DTM/orto
+    # tiles if the script is re-run on directories that already contain tiles.
+    import re
+    tile_pattern = re.compile(r"_x\d{5}_y\d{5}")
+
+    rgb_files = {}
+    for p in rgb_dir.glob("*.png"):
+        stem = p.stem
+        if tile_pattern.search(stem):
+            # skip already-tiled file
+            continue
+        rgb_files[stem] = p
+
+    label_files = {}
+    for p in label_dir.glob("*.png"):
+        stem = p.stem
+        if tile_pattern.search(stem):
+            continue
+        label_files[stem] = p
 
     # optional DTM folder
     dtm_dir = root / "DTM"
