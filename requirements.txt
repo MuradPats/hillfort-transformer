@@ -8,6 +8,7 @@ pandas
 pillow
 plotnine
 rasterio
+seaborn
 scikit-learn
 scipy
 shapely
