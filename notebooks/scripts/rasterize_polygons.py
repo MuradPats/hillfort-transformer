@@ -199,18 +199,23 @@ def main():
                         subset = gdf[gdf[shp_col].astype(str).isin(inspire_ids)]
                     except Exception:
                         subset = gdf
-
                     if subset.empty:
-                        # fallback to spatial intersection
-                        rasterize_for_raster(ref, gdf, out_path, value=args.value)
+                        # No matching polygons in shapefile for this tile's INSPIRE ids.
+                        # Write an empty mask (all-negative) instead of rasterizing
+                        # all protected sites (shapefile contains many site types).
+                        print(f"No matching polygons in shapefile for tile {tile_id}; writing empty mask.")
+                        rasterize_for_raster(ref, subset, out_path, value=args.value)
                     else:
                         rasterize_for_raster(ref, subset, out_path, value=args.value)
                 else:
-                    # No mapping for this tile, fallback to spatial intersection of all polygons
+                    # No mapping for this tile in the CSV — write empty mask rather
+                    # than rasterizing all protected sites (to avoid including
+                    # non-hillfort protected sites).
                     print(
-                        f"No INSPIRE IDs found for tile {tile_id}, using spatial intersection."
+                        f"No INSPIRE IDs found for tile {tile_id}; writing empty mask."
                     )
-                    rasterize_for_raster(ref, gdf, out_path, value=args.value)
+                    empty_gdf = gdf.iloc[0:0]
+                    rasterize_for_raster(ref, empty_gdf, out_path, value=args.value)
             else:
                 print(
                     f"No map CSV provided, using spatial intersection for {ref.name}."
