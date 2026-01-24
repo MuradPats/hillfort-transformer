@@ -13,7 +13,7 @@ class Config:
     label_dir: str = "Label"
 
     # splits (files inside dataset_root)
-    train_list: str = "train.txt"
+    train_list: str = "stratified_train.txt"
     val_list: str = "test.txt"
 
     # training
