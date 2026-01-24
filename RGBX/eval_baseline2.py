@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 
 from config import config
-from utils.pyt_utils import parse_devices
+from utils.pyt_utils import parse_devices, load_model, link_file
 from RGBX.eval import SegEvaluator
 from engine.logger import get_logger
 from dataloader.RGBXDataset import RGBXDataset
@@ -136,12 +136,33 @@ def main():
         args.show_image,
     )
 
-    # Run evaluation: pass the checkpoint path as the model_indice so Evaluator.load_model will load it
-    model_path = "."
-    model_indice = args.ckpt
-    segmentor.run(
-        model_path, model_indice, config.val_log_file, config.link_val_log_file
-    )
+    # If the user passed a checkpoint file path, load it directly to avoid
+    # `Evaluator.run` mis-parsing paths that contain hyphens.
+    if os.path.isfile(args.ckpt):
+        logger.info(f"Loading checkpoint file directly: {args.ckpt}")
+        segmentor.val_func = load_model(network, args.ckpt)
+
+        if len(all_dev) == 1:
+            result_line = segmentor.single_process_evalutation()
+        else:
+            result_line = segmentor.multi_process_evaluation()
+
+        # Write/Link log as Evaluator.run would
+        with open(config.val_log_file, "a") as results:
+            results.write("Model: " + args.ckpt + "\n")
+            results.write(result_line + "\n")
+            results.flush()
+        try:
+            link_file(config.val_log_file, config.link_val_log_file)
+        except Exception:
+            logger.warning("Could not create link for val log file")
+    else:
+        # Fall back to the Evaluator.run logic (accepts epoch strings, ranges, or .pth names)
+        model_path = "."
+        model_indice = args.ckpt
+        segmentor.run(
+            model_path, model_indice, config.val_log_file, config.link_val_log_file
+        )
 
 
 if __name__ == "__main__":
