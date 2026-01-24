@@ -23,7 +23,8 @@ source "$PROJECT_ROOT/venv/bin/activate"
 
 cd "$REPO_ROOT"
 
-export DEBUG_VRAM=1
+# For debugging VRAM issues, set to 1 to enable more verbose logging
+export DEBUG_VRAM=0
 
 python -u -m baseline2.train \
   --dataset-root "$REPO_ROOT/datasets/HillfortDataSet" \
