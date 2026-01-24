@@ -23,8 +23,7 @@ source "$PROJECT_ROOT/venv/bin/activate"
 
 cd "$REPO_ROOT"
 
-python -m baseline2.eval \
-  --dataset-root "$REPO_ROOT/datasets/HillfortDataSet" \
-  --split-list test.txt \
+python "$REPO_ROOT/RGBX/eval_baseline2.py" \
   --ckpt "$REPO_ROOT/runs/baseline2/ckpt_epoch_10.pt" \
-  --save-path "$REPO_ROOT/runs/baseline2/eval"
+  -d 0 \
+  --save_path "$REPO_ROOT/runs/baseline2/eval"
