@@ -12,6 +12,7 @@ INSPIRE ids from the CSV column `INSPIRE id`, filter the shapefile GeoDataFrame
 by that id, rasterise geometries to the ortho image grid and save an 8-bit
 PNG mask with values 0 (background) and 1 (positive).
 """
+
 from pathlib import Path
 import argparse
 import warnings
@@ -32,12 +33,13 @@ def parse_inspire_ids(val: str):
     if pd.isna(val):
         return []
     # sometimes there may be multiple ids separated by commas or semicolons
-    parts = [p.strip() for p in str(val).replace(';', ',').split(',')]
+    parts = [p.strip() for p in str(val).replace(";", ",").split(",")]
     return [p for p in parts if p]
 
 
-def make_mask_for_tile(tif_path: Path, map_tiles_df: pd.DataFrame, gdf, cfg,
-                       mask_size: int, out_path: Path):
+def make_mask_for_tile(
+    tif_path: Path, map_tiles_df: pd.DataFrame, gdf, cfg, mask_size: int, out_path: Path
+):
     """Rasterise polygons for a single ortho tile and save PNG mask.
 
     - tif_path: path to ortho .tif
@@ -48,33 +50,46 @@ def make_mask_for_tile(tif_path: Path, map_tiles_df: pd.DataFrame, gdf, cfg,
     - out_path: where to write the PNG mask
     """
     stem = tif_path.stem
-    rows = map_tiles_df[map_tiles_df[cfg['tile_col']].astype(str).str.strip() == stem]
+
+    # Support comma/semicolon-separated tile cells (e.g. "63353, 63351")
+    def _cell_to_list(cell):
+        if pd.isna(cell):
+            return []
+        parts = [p.strip() for p in str(cell).replace(";", ",").split(",")]
+        return [p for p in parts if p]
+
+    rows = map_tiles_df[
+        map_tiles_df[cfg["tile_col"]].apply(lambda c: str(stem) in _cell_to_list(c))
+    ]
 
     if rows.empty:
         # no mapping rows -> empty mask
+        print(f"DEBUG: no CSV mapping rows found for tile '{stem}' (column={cfg['tile_col']})")
         mask = np.zeros((mask_size, mask_size), dtype=np.uint8)
         Image.fromarray(mask).save(out_path)
         return
 
     # collect INSPIRE ids (split if necessary)
     ids = []
-    for val in rows[cfg['inspire_col']].dropna().unique():
+    for val in rows[cfg["inspire_col"]].dropna().unique():
         ids.extend(parse_inspire_ids(val))
     ids = list(dict.fromkeys(ids))
 
     if not ids:
+        print(f"DEBUG: no INSPIRE ids parsed for tile '{stem}'; rows present but no INSPIRE id values")
         mask = np.zeros((mask_size, mask_size), dtype=np.uint8)
         Image.fromarray(mask).save(out_path)
         return
 
     # filter gdf by id column
     try:
-        gdf_sub = gdf[gdf[cfg['gdf_id_col']].isin(ids)]
+        gdf_sub = gdf[gdf[cfg["gdf_id_col"]].isin(ids)]
     except Exception:
         # fallback: try matching on stringified id
-        gdf_sub = gdf[gdf[cfg['gdf_id_col']].astype(str).isin(ids)]
+        gdf_sub = gdf[gdf[cfg["gdf_id_col"]].astype(str).isin(ids)]
 
     if gdf_sub.empty:
+        print(f"DEBUG: no geometries in shapefile matched INSPIRE ids {ids}")
         mask = np.zeros((mask_size, mask_size), dtype=np.uint8)
         Image.fromarray(mask).save(out_path)
         return
@@ -88,27 +103,26 @@ def make_mask_for_tile(tif_path: Path, map_tiles_df: pd.DataFrame, gdf, cfg,
         # reproject geometries to the raster CRS if needed
         if gdf_sub.crs != src_crs:
             try:
+                print(f"DEBUG: reprojecting geometries from {gdf_sub.crs} to {src_crs}")
                 gdf_sub = gdf_sub.to_crs(src_crs)
-            except Exception:
-                warnings.warn(f"Could not reproject geometries to {src_crs}; mask will be empty")
-                mask = np.zeros((mask_size, mask_size), dtype=np.uint8)
-                Image.fromarray(mask).save(out_path)
-                return
+            except Exception as e:
+                # Fail loudly so reprojection issues are visible
+                raise RuntimeError(f"Failed to reproject geometries to {src_crs}: {e}")
 
         shapes = [(mapping(geom), 1) for geom in gdf_sub.geometry if geom is not None]
 
         if not shapes:
+            print("DEBUG: geometry list empty after filtering; writing empty mask")
             mask = np.zeros((mask_size, mask_size), dtype=np.uint8)
             Image.fromarray(mask).save(out_path)
             return
 
-        mask_arr = rasterize(
-            shapes=shapes,
-            out_shape=(height, width),
-            transform=transform,
-            fill=0,
-            dtype=np.uint8,
-        )
+        # Diagnostic logging before rasterization
+        print(f"DEBUG: src bounds={src.bounds}, src.shape={(height, width)}")
+        print(f"DEBUG: gdf_sub.total_bounds={gdf_sub.total_bounds}, num_shapes={len(shapes)}")
+
+        mask_arr = rasterize(shapes=shapes, out_shape=(height, width), transform=transform, fill=0, dtype=np.uint8)
+        print(f"DEBUG: rasterize produced positive pixels: {int(mask_arr.sum())}")
 
     # ensure output is the desired mask_size x mask_size
     # mask_arr is 0/1 uint8; save as 0/1 (not 0/255) so downstream metrics
@@ -126,14 +140,36 @@ def make_mask_for_tile(tif_path: Path, map_tiles_df: pd.DataFrame, gdf, cfg,
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--ortho-dir", default="data/raw/orto", help="Directory with ortho TIFs")
-    p.add_argument("--csv", default="data/linnamagede_ruudunumbrid_v2.csv", help="CSV mapping tiles to INSPIRE ids")
-    p.add_argument("--shapefile", default="data/raw/inspire/PS_ProtectedSite_malestisedPolygon.shp", help="Polygon shapefile")
-    p.add_argument("--out-dir", default="data/gt_masks", help="Output directory for PNG masks")
-    p.add_argument("--mask-size", default=5000, type=int, help="Output mask size (square)")
-    p.add_argument("--tile-col", default="Ruudunumber(1:10000)", help="Tile id column in CSV")
-    p.add_argument("--inspire-col", default="INSPIRE id", help="INSPIRE id column in CSV")
-    p.add_argument("--gdf-id-col", default="inspireid_", help="id column name in shapefile GeoDataFrame")
+    p.add_argument(
+        "--ortho-dir", default="data/raw/orto", help="Directory with ortho TIFs"
+    )
+    p.add_argument(
+        "--csv",
+        default="data/linnamagede_ruudunumbrid_v2.csv",
+        help="CSV mapping tiles to INSPIRE ids",
+    )
+    p.add_argument(
+        "--shapefile",
+        default="data/raw/inspire/PS_ProtectedSite_malestisedPolygon.shp",
+        help="Polygon shapefile",
+    )
+    p.add_argument(
+        "--out-dir", default="data/gt_masks", help="Output directory for PNG masks"
+    )
+    p.add_argument(
+        "--mask-size", default=5000, type=int, help="Output mask size (square)"
+    )
+    p.add_argument(
+        "--tile-col", default="Ruudunumber(1:10000)", help="Tile id column in CSV"
+    )
+    p.add_argument(
+        "--inspire-col", default="INSPIRE id", help="INSPIRE id column in CSV"
+    )
+    p.add_argument(
+        "--gdf-id-col",
+        default="inspireid_",
+        help="id column name in shapefile GeoDataFrame",
+    )
     args = p.parse_args()
 
     ortho_dir = Path(args.ortho_dir)
@@ -157,9 +193,9 @@ def main():
     gdf = gpd.read_file(shapefile)
 
     cfg = {
-        'tile_col': args.tile_col,
-        'inspire_col': args.inspire_col,
-        'gdf_id_col': args.gdf_id_col,
+        "tile_col": args.tile_col,
+        "inspire_col": args.inspire_col,
+        "gdf_id_col": args.gdf_id_col,
     }
 
     tif_files = sorted(ortho_dir.glob("*.tif"))
