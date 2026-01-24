@@ -30,7 +30,7 @@ python -u -m baseline2.train \
   --dataset-root "$REPO_ROOT/datasets/HillfortDataSet" \
   --train-list "stratified_train.txt" \
   --val-list "test.txt" \
-  --use-dtm true \
+  --use-dtm \
   --batch-size 4 \
   --epochs 10 \
   --lr 3e-4 \
