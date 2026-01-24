@@ -85,7 +85,7 @@ class SegEvaluator(Evaluator):
             freq_IoU,
             mean_pixel_acc,
             pixel_acc,
-            dataset.class_names,
+            self.dataset.class_names,
             show_no_back=False,
         )
         return result_line
@@ -114,7 +114,12 @@ if __name__ == "__main__":
     except Exception:
         weight = None
 
-    criterion = DiceCrossEntropyLoss(dice_weight=config.dice_weight, ce_weight=config.ce_weight, ignore_index=255, weight=weight)
+    criterion = DiceCrossEntropyLoss(
+        dice_weight=config.dice_weight,
+        ce_weight=config.ce_weight,
+        ignore_index=255,
+        weight=weight,
+    )
     network = segmodel(cfg=config, criterion=criterion, norm_layer=nn.BatchNorm2d)
     data_setting = {
         "rgb_root": config.rgb_root_folder,
