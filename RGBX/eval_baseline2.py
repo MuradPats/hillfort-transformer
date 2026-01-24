@@ -6,7 +6,7 @@ import torch.nn as nn
 
 from config import config
 from utils.pyt_utils import parse_devices
-from engine.evaluator import SegEvaluator
+from RGBX.eval import SegEvaluator
 from engine.logger import get_logger
 from dataloader.RGBXDataset import RGBXDataset
 from dataloader.dataloader import ValPre
@@ -97,7 +97,9 @@ def main():
             try:
                 base.load_state_dict(ckpt["state_dict"], strict=False)
             except Exception:
-                logger.warning("Fallback state_dict load failed; continuing with partially loaded model")
+                logger.warning(
+                    "Fallback state_dict load failed; continuing with partially loaded model"
+                )
 
     network = BaselineAdapter(base)
 
