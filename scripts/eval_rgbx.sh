@@ -24,6 +24,7 @@ SCRIPT_DIR="/gpfs/helios/home/sandersa/transformers/hillfort-transformer/scripts
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 PROJECT_ROOT="$(cd "$REPO_ROOT/.." && pwd)"
 EVAL_PY="$REPO_ROOT/RGBX/eval.py"
+OUTPUT_DIR="modelv4_results"
 
 if [ ! -f "$EVAL_PY" ]; then
   echo "Eval script not found: $EVAL_PY" >&2
@@ -47,7 +48,7 @@ cd "$REPO_ROOT" || { echo "Failed to cd to repo root $REPO_ROOT"; exit 1; }
 
 # Default evaluation args if none provided: use GPU device 0
 if [ "$#" -eq 0 ]; then
-  ARGS=("-d" "0" "-p" "$REPO_ROOT/eval")
+  ARGS=("-d" "0" "-p" "$REPO_ROOT/runs/$OUTPUT_DIR")
 else
   ARGS=("$@")
 fi
