@@ -69,7 +69,14 @@ def main():
         state = ckpt
 
     def infer_in_channels_from_state(sd: dict) -> int:
-        # Heuristic: find the first 4-D tensor (conv weight) and return its in_channels
+        # Prefer a baseline2-style first-conv key if present
+        for key in ("enc1.net.0.weight", "enc1.0.weight", "enc1.weight"):
+            if key in sd:
+                v = sd[key]
+                if hasattr(v, "ndim") and v.ndim == 4:
+                    return int(v.shape[1])
+
+        # Fallback: find the first 4-D tensor (conv weight) and return its in_channels
         for k in sorted(sd.keys()):
             v = sd[k]
             if hasattr(v, "ndim") and v.ndim == 4:
@@ -137,10 +144,22 @@ def main():
     )
 
     # If the user passed a checkpoint file path, load it directly to avoid
-    # `Evaluator.run` mis-parsing paths that contain hyphens.
+    # `Evaluator.run` mis-parsing paths that contain hyphens. Load weights
+    # into the raw `base` model (not the adapter) to avoid name-prefix issues.
     if os.path.isfile(args.ckpt):
         logger.info(f"Loading checkpoint file directly: {args.ckpt}")
-        segmentor.val_func = load_model(network, args.ckpt)
+        try:
+            # load weights into the base UNetSmall
+            load_model(base, args.ckpt)
+        except Exception:
+            # best-effort fallback
+            try:
+                base.load_state_dict(state, strict=False)
+            except Exception:
+                logger.warning("Failed to fully load checkpoint into baseline model")
+
+        # Wrap the loaded base for RGBX evaluator usage
+        segmentor.val_func = BaselineAdapter(base)
 
         if len(all_dev) == 1:
             result_line = segmentor.single_process_evalutation()
