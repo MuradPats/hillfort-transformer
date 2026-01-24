@@ -28,6 +28,15 @@ class BaselineAdapter(nn.Module):
     def __init__(self, base_model: nn.Module):
         super().__init__()
         self.base = base_model
+        # Detect expected input channels from the base model's first Conv2d
+        self.expected_in = None
+        for m in base_model.modules():
+            if isinstance(m, nn.Conv2d):
+                try:
+                    self.expected_in = int(m.in_channels)
+                except Exception:
+                    self.expected_in = None
+                break
 
     def forward(self, img, modal_x=None):
         # img: (B,C,H,W), modal_x: (B,C2,H,W) or (B,1,H,W)
@@ -35,13 +44,51 @@ class BaselineAdapter(nn.Module):
             return self.base(img)
 
         # Ensure tensors are compatible and concatenate on channel dim
-        if img.dim() == 4 and modal_x.dim() == 4:
+        if not (img.dim() == 4 and modal_x.dim() == 4):
+            return self.base(img)
+
+        img_ch = img.shape[1]
+        mod_ch = modal_x.shape[1]
+
+        # If we couldn't detect expected channels, try naive concat
+        if self.expected_in is None:
             try:
                 inp = torch.cat([img, modal_x], dim=1)
             except Exception:
-                # fallback: ignore modal_x if concat fails
                 inp = img
+
+            return self.base(inp)
+
+        need = self.expected_in - img_ch
+        if need == mod_ch:
+            modal = modal_x
+        elif need <= 0:
+            # Model expects no modal channels (or fewer than img channels) — trim img
+            inp = img[:, : self.expected_in, :, :]
+            return self.base(inp)
         else:
+            # need > 0 but modal_x channels may not match; reduce or expand modal accordingly
+            if mod_ch == need:
+                modal = modal_x
+            elif mod_ch > need:
+                # reduce by taking mean across groups if need ==1, else slice
+                if need == 1:
+                    modal = modal_x.mean(dim=1, keepdim=True)
+                else:
+                    modal = modal_x[:, :need, :, :]
+            else:
+                # mod_ch < need: repeat channels to fill, or mean then repeat
+                if mod_ch == 1:
+                    # replicate single channel
+                    modal = modal_x.repeat(1, need, 1, 1)
+                else:
+                    # mean to one channel then replicate
+                    m = modal_x.mean(dim=1, keepdim=True)
+                    modal = m.repeat(1, need, 1, 1)
+
+        try:
+            inp = torch.cat([img, modal], dim=1)
+        except Exception:
             inp = img
 
         return self.base(inp)
