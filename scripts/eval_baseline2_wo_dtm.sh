@@ -24,6 +24,6 @@ source "$PROJECT_ROOT/venv/bin/activate"
 cd "$REPO_ROOT"
 
 python "$REPO_ROOT/RGBX/eval_baseline2.py" \
-  --ckpt "$REPO_ROOT/runs/baseline2_wo_dtm/ckpt_epoch_10.pt" \
+  --ckpt "$REPO_ROOT/runs/baseline2_v2_3c/ckpt_epoch_10.pt" \
   -d 0 \
-  --save_path "$REPO_ROOT/runs/baseline2_wo_dtm/eval"
+  --save_path "$REPO_ROOT/runs/baseline2_v2_3c/eval"
