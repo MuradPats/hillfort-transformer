@@ -1,80 +1,50 @@
-# Hillfort Transformer: RGB-X Semantic Segmentation for Hillfort Detection
+# Hillfort Transformer — RGB+DTM semantic segmentation
 
-A deep learning project for automated detection and segmentation of hillforts from aerial imagery using multi-modal RGB and Digital Terrain Model (DTM) data. This repository implements state-of-the-art semantic segmentation architectures with cross-modal fusion capabilities.
+This repository contains code and assets for automated detection and segmentation of small archaeological hillforts using fused aerial RGB orthoimagery and LiDAR-derived Digital Terrain Models (DTMs). The implementation adapts the CMX cross-modal fusion approach with transformer backbones (SegFormer / MiT) and includes data preparation, training, evaluation and baseline models.
 
-## Project Overview
+## Abstract
 
-This project combines **RGB orthoimagery** and **Digital Terrain Models (DTM)** to perform binary semantic segmentation for hillfort detection. The system uses transformer-based encoders (SegFormer, Swin Transformer) with specialized decoders optimized for detecting archaeological features in topographic data.
+Automated detection of small archaeological hillforts in large airborne datasets is challenging due to subtle topographic signatures and extreme class imbalance ($\sim$0.073\% positive pixels). We implemented a transformer-based semantic segmentation approach (RGBX with SegFormer backbone) that fuses aerial RGB imagery with LiDAR-derived digital terrain models via cross-modal feature integration (CMX). Our pipeline includes rasterisation of polygon labels, co-registration of RGB and DTM data, normalisation, and stratified tiling with oversampling to handle sparse positives. We evaluated on 118 test tiles covering 2.95B pixels. Baseline U-Net models achieved low training loss (0.01) but very poor hillfort detection performance (IoU=0.1\%, F1=0.2\%), demonstrating failure under extreme class imbalance. Transformer-based RGBX models showed substantial improvement: v2 and v3 achieved hillfort IoU of 14.7--15.7\% and F1 scores of $\sim$50\%. RGBX_v4 achieved significantly higher metrics (hillfort IoU=83.1\%, F1=90.7\%) but exhibited anomalous training behaviour (sudden 6x loss drop at epoch 34), making these results require validation. Results demonstrate that modern transformer architectures with cross-modal fusion can effectively handle extreme class imbalance in archaeological detection tasks, significantly outperforming traditional CNN baselines.
 
-### Key Features
+## Highlights
 
-- **Multi-modal Input**: Fuses RGB imagery with DTM auxiliary data for improved segmentation
-- **Transformer Architectures**: Supports SegFormer (mit_b0-b5) and Swin Transformer backbones
-- **Multiple Decoders**: Includes MLPDecoder, UPernet, and DeepLabV3+ decoders
-- **Stratified Training**: Balances positive/negative samples with stratified bucket-based sampling
-- **Distributed Training**: Multi-GPU support via PyTorch DistributedDataParallel
-- **Automated Data Preprocessing**: Scripts for rasterizing vector geometries, tiling datasets, and computing statistics
-- **Class Imbalance Handling**: Pixel-level weighting and tile-level oversampling strategies
+- **Multi-modal fusion (RGB + DTM):** dual-stream encoders with rectify-then-fuse cross-modal modules (CM-FRM + FFM).
+- **Transformer backbones:** SegFormer (MiT) encoders (used: mit_b2 in experiments).
+- **Baselines included:** U-Net variants (RGB-only and RGB+DTM) for comparison.
+- **Class imbalance handling:** stratified tile buckets, sampling with replacement, per-tile/pixel weighting.
+- **Preprocessing utilities:** rasterisation of polygons, tiling to 512×512, and dataset statistics generation.
 
+## Repo structure (top-level)
 
-## Configuration (`config.py`)
+- `RGBX/` — model code and configuration for RGB+DTM fusion[^1] (encoders, fusion modules, decoders, config).
+- `baseline/`, `baseline2/` — baseline model implementations and training/evaluation scripts.
+- `data/` — example and processed data artifacts (tile statistics, rasters, masks).
+- `scripts/` — preprocessing, rasterisation and helper scripts used to prepare data and evaluate models.
+- `notebooks/` — exploratory analysis and visualisation notebooks used during development.
+- `runs/` — training run artifacts and results (predicted masks, logs, metrics).
 
-The [RGBX/config.py](RGBX/config.py) file centralizes all training hyperparameters:
+## Data
 
-### Dataset Configuration
-- **Dataset Name**: `HillfortDataSet`
-- **Image Format**: 512×512 PNG tiles (RGB)
-- **Ground Truth**: Single-channel PNG masks (0=background, 1=hillfort)
-- **Auxiliary Input (DTM)**: Single-channel GeoTIFF files
+- Input: paired 512×512 RGB tiles and single-channel DTM tiles (co-registered). Tiles produced from national geospatial rasters and vector polygon annotations.
+- Labels: binary masks (0=background, 1=hillfort). The full test set comprises 118 raster tiles with an overall positive-pixel fraction ~0.08% (extreme class imbalance).
 
-### Model Architecture
-- **Backbone**: SegFormer-B2 (mit_b2) - transformer-based encoder
-- **Decoder**: MLPDecoder
-- **Input Channels**: 4 (RGB + DTM stacked)
-- **Output**: 2 classes (background, hillfort)
-- **Pretrained Weights**: SegFormer mit_b2.pth
+## Training & evaluation (summary from report)
 
-### Training Hyperparameters
-- **Batch Size**: 8
-- **Learning Rate**: 6e-5 (with cosine annealing)
-- **Optimizer**: AdamW with weight decay 0.01
-- **Epochs**: 20
-- **Warm-up Epochs**: 10
-- **Loss Function**: DiceCrossEntropyLoss (dice_weight=1.0, ce_weight=1.0)
+- Main model: CMX-style RGBX with dual SegFormer-B2 encoders and an MLP decoder.
+- Optimiser: AdamW ($\beta_1=0.9$, $\beta_2=0.999$, weight decay 0.01). The learning rate starts at $6 \times 10^{-5}$ and follows a polynomial warm-up/decay with a 10-epoch warm-up.
+- Typical training config used in experiments: batch size 8, lr 6e-5, 40 epochs
+- Loss: combination of Dice loss and cross-entropy (with dynamic class weights clipped to avoid instability).
+- Evaluation metrics: pixel-level IoU, precision, recall, F1 (computed via sliding-window inference and optional ensembling).
 
-### Class Imbalance Handling
-- **Stratified Bucket Sampling**: Divides tiles into buckets by positive pixel fraction
-  - `neg`: 0% positives
-  - `small`: 0% < f ≤ 0.1%
-  - `mid`: 0.1% < f ≤ 1%
-  - `full`: f > 1%
-- **Bucket Proportions**: [0.5, 0.25, 0.15, 0.10] (configurable)
-- **Positive Oversampling**: 3× duplication of positive bucket entries
-- **Pixel-Level Weighting**: Computed from tile_stats.csv for precise class balancing
-- **Max Class Weight Clipping**: 50.0 (prevents extreme weights)
+Results reported in the project LaTeX report show substantial improvements of transformer RGBX models over U-Net baselines under extreme class imbalance; see `Report.pdf` for full experimental details and quantitative tables.
 
-### Data Augmentation
-- **Random Scaling**: [0.5, 0.75, 1.0, 1.25, 1.5, 1.75]
-- **Evaluation Scaling**: 1.0 (no test-time augmentation)
-- **Evaluation Stride**: 2/3 (sliding window with 33% overlap)
-- **Normalization Mean**: [0.485, 0.456, 0.406] (ImageNet standard)
-- **Normalization Std**: [0.229, 0.224, 0.225]
+## Files to inspect
 
-## Dataset Format
+- `Report.pdf` — full project report with methodology, dataset details, experiments and results.
 
-### File Format Details
-- **RGB**: PNG files, 8-bit RGB (3 channels), 512×512
-- **Labels**: PNG files, 8-bit grayscale (1 channel), 0 or 1, 512×512
-- **DTM**: GeoTIFF files, 32-bit float (single channel), 512×512
-- **train.txt / test.txt**: Text files with tile basenames (no extension)
+## Notes & caveats
 
-## Model Checkpoints
+- The dataset exhibits extreme class imbalance (positive pixels << 1%), so training uses stratified sampling with replacement and dynamic loss weighting. These strategies are implemented in the training pipeline and explained in `Report.pdf`.
+- Some experimental runs exhibited anomalous behaviour (e.g., sudden loss drops) that require validation; treat exceptionally high reported metrics with caution until independently verified.
 
-### Available Backbones
-- **SegFormer**: mit_b0 (32M params), mit_b1, mit_b2, mit_b4, mit_b5 (82M params)
-- **Swin Transformer**: swin_s, swin_b
-
-### Decoder Options
-- **MLPDecoder**: Lightweight, efficient MLP-based fusion
-- **UPernet**: Pyramid pooling module for multi-scale features
-- **DeepLabV3+**: Atrous spatial pyramid pooling
+[^1]: Jiaming Zhang, Huayao Liu, Kailun Yang, Xinxin Hu, Ruiping Liu, and Rainer Stiefelhagen. CMX: Cross-Modal Fusion for RGB-X Semantic Segmentation With Transformers. IEEE Transactions on Intelligent Transportation Systems, 24(12):14679–14694, December 2023. Repository: https://github.com/huaaaliu/RGBX_Semantic_Segmentation.
