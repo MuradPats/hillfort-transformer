@@ -2,7 +2,9 @@
 data/raw/dtm/
 data/raw/satellite/
 data/raw/inspire/*
+data/dtm/
 datasets/
+models/*
 !data/raw/inspire/*.zip
 
 data/raw/dtmFiles/
